@@ -1,0 +1,21 @@
+{
+  "manifest_version": 3,
+  "name": "Gemini AddOn",
+  "description": "Löscht Ordner basierend auf maximaler Anzahl und Datum.",
+  "version": "1.0.0",
+  "action": {
+    "default_title": "Gemini AddOn",
+    "default_popup": "index.html",
+    "default_icon": {
+      "16": "icon.png",
+      "48": "icon.png",
+      "128": "icon.png"
+    }
+  },
+  "permissions": ["storage", "activeTab", "scripting"],
+  "icons": {
+    "16": "icon.png",
+    "48": "icon.png",
+    "128": "icon.png"
+  }
+}
