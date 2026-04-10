@@ -54,9 +54,10 @@ async function prompt(titles, maxFolder) {
     const result = await model.generateContent(prompt);
     const response = await result.response;
     console.log("--- Gemini Erfolg! ---");
-    // console.log("Antwort:", response.text());
+    console.log("Antwort:", response.text());
   } catch (error) {
     console.error("--- Fehler bei Gemini ---");
-    // console.error("Nachricht:", error.message);
+    console.error("Nachricht:", error.message);
   }
+  return result.response.text();
 }

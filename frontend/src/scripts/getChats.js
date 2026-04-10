@@ -1,3 +1,6 @@
+export const CONVERSATION_ITEM_SELECTOR =
+  ".conversation-items-container, .conversations-items-container";
+
 export function getConversations(root = document) {
   const conversationsList =
     root.getElementById?.("conversations-list-0") ??
@@ -8,11 +11,8 @@ export function getConversations(root = document) {
     return [];
   }
 
-  const conversationItemSelector =
-    ".conversation-items-container, .conversations-items-container";
-
   return Array.from(
-    conversationsList.querySelectorAll(conversationItemSelector),
+    conversationsList.querySelectorAll(CONVERSATION_ITEM_SELECTOR),
   ).map((container) => ({
     element: container,
     text: container.textContent?.trim() || "",

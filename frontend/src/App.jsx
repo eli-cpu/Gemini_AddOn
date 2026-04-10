@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import "./App.css";
 import { getConversations } from "./scripts/getChats";
+import { sortChats } from "./scripts/sortChats";
 
 function App() {
   const [maxFolders, setMaxFolders] = useState("");
@@ -34,42 +35,79 @@ function App() {
     setStatus("Gespeichert (ohne chrome.storage).");
   };
 
-  const handleTestGetConversations = async () => {
-    setStatus("");
+  const readConversationsForTests = async () => {
+    if (
+      typeof chrome !== "undefined" &&
+      chrome.tabs?.query &&
+      chrome.scripting?.executeScript
+    ) {
+      const [tab] = await chrome.tabs.query({
+        active: true,
+        currentWindow: true,
+      });
 
-    try {
-      if (
-        typeof chrome !== "undefined" &&
-        chrome.tabs?.query &&
-        chrome.scripting?.executeScript
-      ) {
-        const [tab] = await chrome.tabs.query({
-          active: true,
-          currentWindow: true,
-        });
-
-        if (!tab?.id) {
-          setStatus("Kein aktiver Tab gefunden.");
-          return;
-        }
-
-        const [result] = await chrome.scripting.executeScript({
-          target: { tabId: tab.id },
-          func: getConversations,
-        });
-
-        const conversations = result?.result || [];
-        console.log("Conversations:", conversations);
-        setStatus(`${conversations.length} Chats gefunden.`);
-        return;
+      if (!tab?.id) {
+        throw new Error("Kein aktiver Tab gefunden.");
       }
 
-      const conversations = getConversations();
+      const [result] = await chrome.scripting.executeScript({
+        target: { tabId: tab.id },
+        func: () => {
+          const list = document.getElementById("conversations-list-0");
+          if (!list) return [];
+          const items = list.querySelectorAll(
+            ".conversation-items-container, .conversations-items-container",
+          );
+          return Array.from(items).map((container) => ({
+            text: container.textContent?.trim() || "",
+            html: container.innerHTML,
+          }));
+        },
+      });
+
+      return result?.result || [];
+    }
+
+    return getConversations().map(({ text, html }) => ({ text, html }));
+  };
+
+  const handleTestGetConversations = async () => {
+    setStatus("");
+    try {
+      const conversations = await readConversationsForTests();
       console.log("Conversations:", conversations);
       setStatus(`${conversations.length} Chats gefunden.`);
     } catch (error) {
       console.error(error);
       setStatus("Test fehlgeschlagen.");
+    }
+  };
+
+  const handleTestSortChats = async () => {
+    setStatus("");
+    try {
+      const conversations = await readConversationsForTests();
+      const sorted = sortChats([...conversations]) ?? conversations;
+      console.log("Sort input:", conversations);
+      console.log("Sort output:", sorted);
+      setStatus(`sortChats getestet (${sorted.length} Chats).`);
+    } catch (error) {
+      console.error(error);
+      setStatus("sortChats-Test fehlgeschlagen.");
+    }
+  };
+
+  const handleTestSortChatsExtra = async () => {
+    setStatus("");
+    try {
+      const conversations = await readConversationsForTests();
+      const sorted = sortChats([...conversations]) ?? conversations;
+      console.log("Extra sort input:", conversations);
+      console.log("Extra sort output:", sorted);
+      setStatus(`Extra sortChats-Test ok (${sorted.length} Chats).`);
+    } catch (error) {
+      console.error(error);
+      setStatus("Extra sortChats-Test fehlgeschlagen.");
     }
   };
 
@@ -110,6 +148,14 @@ function App() {
 
         <button className="counter" onClick={handleTestGetConversations}>
           Test: getConversations
+        </button>
+
+        <button className="counter" onClick={handleTestSortChats}>
+          Test: sortChats
+        </button>
+
+        <button className="counter" onClick={handleTestSortChatsExtra}>
+          Test: sortChats (extra)
         </button>
 
         {status && <p className="status">{status}</p>}
