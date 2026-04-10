@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import "./App.css";
+import { getConversations } from "./scripts/getChats";
 
 function App() {
   const [maxFolders, setMaxFolders] = useState("");
@@ -25,14 +26,51 @@ function App() {
     };
 
     if (typeof chrome !== "undefined" && chrome.storage?.local) {
-      chrome.storage.local.set(payload, () => {
-        setStatus("Gespeichert.");
-      });
+      chrome.storage.local.set(payload, () => setStatus("Gespeichert."));
       return;
     }
 
     console.log("Settings:", payload);
     setStatus("Gespeichert (ohne chrome.storage).");
+  };
+
+  const handleTestGetConversations = async () => {
+    setStatus("");
+
+    try {
+      if (
+        typeof chrome !== "undefined" &&
+        chrome.tabs?.query &&
+        chrome.scripting?.executeScript
+      ) {
+        const [tab] = await chrome.tabs.query({
+          active: true,
+          currentWindow: true,
+        });
+
+        if (!tab?.id) {
+          setStatus("Kein aktiver Tab gefunden.");
+          return;
+        }
+
+        const [result] = await chrome.scripting.executeScript({
+          target: { tabId: tab.id },
+          func: getConversations,
+        });
+
+        const conversations = result?.result || [];
+        console.log("Conversations:", conversations);
+        setStatus(`${conversations.length} Chats gefunden.`);
+        return;
+      }
+
+      const conversations = getConversations();
+      console.log("Conversations:", conversations);
+      setStatus(`${conversations.length} Chats gefunden.`);
+    } catch (error) {
+      console.error(error);
+      setStatus("Test fehlgeschlagen.");
+    }
   };
 
   return (
@@ -55,9 +93,10 @@ function App() {
           </label>
 
           <label className="field">
-            <span>B) Löschen, wenn älter als (Datum)</span>
+            <span>B) Maximale Anzahl an Chats, die übrig bleiben sollen</span>
             <input
-              type="date"
+              type="number"
+              min="1"
               required
               value={deleteOlderThan}
               onChange={(e) => setDeleteOlderThan(e.target.value)}
@@ -68,6 +107,10 @@ function App() {
             Speichern
           </button>
         </form>
+
+        <button className="counter" onClick={handleTestGetConversations}>
+          Test: getConversations
+        </button>
 
         {status && <p className="status">{status}</p>}
       </section>
