@@ -83,31 +83,17 @@ function App() {
     }
   };
 
-  const handleTestSortChats = async () => {
+  const handleTestSortChats = async (label = "sortChats") => {
     setStatus("");
     try {
       const conversations = await readConversationsForTests();
       const sorted = sortChats([...conversations]) ?? conversations;
-      console.log("Sort input:", conversations);
-      console.log("Sort output:", sorted);
-      setStatus(`sortChats getestet (${sorted.length} Chats).`);
+      console.log(`${label} input:`, conversations);
+      console.log(`${label} output:`, sorted);
+      setStatus(`${label}-Test ok (${sorted.length} Chats).`);
     } catch (error) {
       console.error(error);
-      setStatus("sortChats-Test fehlgeschlagen.");
-    }
-  };
-
-  const handleTestSortChatsExtra = async () => {
-    setStatus("");
-    try {
-      const conversations = await readConversationsForTests();
-      const sorted = sortChats([...conversations]) ?? conversations;
-      console.log("Extra sort input:", conversations);
-      console.log("Extra sort output:", sorted);
-      setStatus(`Extra sortChats-Test ok (${sorted.length} Chats).`);
-    } catch (error) {
-      console.error(error);
-      setStatus("Extra sortChats-Test fehlgeschlagen.");
+      setStatus(`${label}-Test fehlgeschlagen.`);
     }
   };
 
@@ -150,11 +136,17 @@ function App() {
           Test: getConversations
         </button>
 
-        <button className="counter" onClick={handleTestSortChats}>
+        <button
+          className="counter"
+          onClick={() => handleTestSortChats("sortChats")}
+        >
           Test: sortChats
         </button>
 
-        <button className="counter" onClick={handleTestSortChatsExtra}>
+        <button
+          className="counter"
+          onClick={() => handleTestSortChats("Extra sortChats")}
+        >
           Test: sortChats (extra)
         </button>
 

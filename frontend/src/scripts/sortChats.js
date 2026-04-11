@@ -1,4 +1,4 @@
-require("dotenv").config();
+// require("dotenv").config();
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 
 // --- KONFIGURATION ---
@@ -16,30 +16,41 @@ const model = genAI.getGenerativeModel({
 });
 
 function getTitles(chats) {
-  if (!chats || chats.length === 0) {
+  if (!Array.isArray(chats) || chats.length === 0) {
     console.warn("Keine Chats zum Sortieren gefunden");
-    return;
+    return [];
   }
 
   const titles = [];
 
   chats.forEach((chat) => {
-    const titleDiv = chat.element.querySelector(".conversation-title");
+    const titleFromElement = chat?.element
+      ?.querySelector?.(".conversation-title")
+      ?.textContent?.trim();
 
-    if (titleDiv) {
-      titles.push(titleDiv.textContent?.trim() || "");
+    const title = titleFromElement || chat?.text?.trim() || "";
+    if (title) {
+      titles.push(title);
     } else {
-      console.warn("Titel-Div nicht gefunden in:", chat.element);
+      console.warn("Kein Titel gefunden in:", chat);
     }
   });
 
   return titles;
 }
 
-export function sortChats(chats, maxNum, maxFolder) {
-  const titles = getTitles(chats).slice(0, maxNum);
+export function sortChats(
+  chats,
+  maxNum = Number.MAX_SAFE_INTEGER,
+  maxFolder = 5,
+) {
+  const safeChats = Array.isArray(chats) ? chats : [];
+  const titles = getTitles(safeChats).slice(0, maxNum);
 
-  const genAI = new GoogleGenerativeAI(GEMINI_KEY);
+  // Optional später für Gemini nutzen:
+  prompt(titles, maxFolder);
+
+  return safeChats;
 }
 
 async function prompt(titles, maxFolder) {
