@@ -13,6 +13,10 @@
     }
   },
   "permissions": ["storage", "activeTab", "scripting"],
+  "host_permissions": [
+    "https://gemini.google.com/*",
+    "https://gemini.googleusercontent.com/*"
+  ],
   "icons": {
     "16": "icon.png",
     "48": "icon.png",

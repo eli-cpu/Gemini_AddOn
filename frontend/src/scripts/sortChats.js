@@ -2,12 +2,13 @@
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 
 // --- KONFIGURATION ---
-const GEMINI_KEY = process.env.GEMINI_API_KEY;
-
+// const GEMINI_KEY = process.env.GEMINI_API_KEY;
+/*
 if (!GEMINI_KEY) {
   console.error("Fehler: GEMINI_API_KEY fehlt in der .env Datei!");
   process.exit(1);
 }
+*/
 
 // Gemini Setup
 const genAI = new GoogleGenerativeAI(GEMINI_KEY);

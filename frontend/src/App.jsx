@@ -97,6 +97,42 @@ function App() {
     }
   };
 
+  const handleCreateFolderButton = async () => {
+    setStatus("");
+
+    try {
+      if (
+        typeof chrome === "undefined" ||
+        !chrome.tabs?.query ||
+        !chrome.scripting?.executeScript
+      ) {
+        setStatus("Ordner-Erstellung nur in der Extension verfügbar.");
+        return;
+      }
+
+      const [tab] = await chrome.tabs.query({
+        active: true,
+        currentWindow: true,
+      });
+      if (!tab?.id) {
+        setStatus("Kein aktiver Tab gefunden.");
+        return;
+      }
+
+      await chrome.scripting.executeScript({
+        target: { tabId: tab.id },
+        func: () => {
+          window.dispatchEvent(new Event("gemini-addon:create-folder"));
+        },
+      });
+
+      setStatus("Ordner-Erstellung ausgelöst.");
+    } catch (error) {
+      console.error(error);
+      setStatus("Ordner konnte nicht erstellt werden.");
+    }
+  };
+
   return (
     <main className="popup">
       <section className="card">
@@ -148,6 +184,10 @@ function App() {
           onClick={() => handleTestSortChats("Extra sortChats")}
         >
           Test: sortChats (extra)
+        </button>
+
+        <button className="counter" onClick={handleCreateFolderButton}>
+          erstelleFolderButton
         </button>
 
         {status && <p className="status">{status}</p>}
