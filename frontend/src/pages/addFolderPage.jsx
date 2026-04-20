@@ -108,7 +108,10 @@ function AddFolderPage({ onBack }) {
         return;
       }
 
-      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      const [tab] = await chrome.tabs.query({
+        active: true,
+        currentWindow: true,
+      });
       if (!tab?.id) {
         setStatus("Kein aktiver Tab gefunden.");
         return;
@@ -120,13 +123,18 @@ function AddFolderPage({ onBack }) {
           const target =
             document.querySelector(
               "div.chat-history div.chat-history-list conversations-list[data-test-id='all-conversations']",
-            ) || document.querySelector("conversations-list[data-test-id='all-conversations']");
+            ) ||
+            document.querySelector(
+              "conversations-list[data-test-id='all-conversations']",
+            );
 
           if (!target || !target.parentElement) {
             return { ok: false, message: "Ziel-Div nicht gefunden." };
           }
 
-          const existing = document.querySelector("[data-gemini-test-div='true']");
+          const existing = document.querySelector(
+            "[data-gemini-test-div='true']",
+          );
           if (existing) existing.remove();
 
           const testDiv = document.createElement("div");
@@ -141,7 +149,8 @@ function AddFolderPage({ onBack }) {
 
       if (!injection?.result?.ok) {
         setStatus(
-          injection?.result?.message || "Test-Div konnte nicht eingefügt werden.",
+          injection?.result?.message ||
+            "Test-Div konnte nicht eingefügt werden.",
         );
         return;
       }
