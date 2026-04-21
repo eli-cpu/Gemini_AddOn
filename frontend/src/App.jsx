@@ -10,61 +10,11 @@ function App() {
   const [status, setStatus] = useState("");
   const [page, setPage] = useState("home");
 
-  const buildStateKey = (url = "") => `testSeparatorState:${url.split("#")[0]}`;
-
   useEffect(() => {
     if (typeof chrome !== "undefined" && chrome.storage?.local) {
       chrome.storage.local.get(["maxFolders", "deleteOlderThan"], (data) => {
         if (data.maxFolders) setMaxFolders(String(data.maxFolders));
         if (data.deleteOlderThan) setDeleteOlderThan(data.deleteOlderThan);
-      });
-    }
-
-    if (
-      typeof chrome !== "undefined" &&
-      chrome.tabs?.query &&
-      chrome.scripting?.executeScript &&
-      chrome.storage?.local
-    ) {
-      chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
-        const activeTab = tabs?.[0];
-        if (!activeTab?.id || !activeTab?.url) return;
-
-        const key = buildStateKey(activeTab.url);
-        chrome.storage.local.get([key], async (data) => {
-          const enabled = Boolean(data[key]);
-
-          await chrome.scripting.executeScript({
-            target: { tabId: activeTab.id },
-            args: [enabled],
-            func: (isEnabled) => {
-              const id = "my-test-separator";
-              const existing = document.getElementById(id);
-              const container = document.querySelector(".gems-list-container");
-
-              if (isEnabled) {
-                if (existing || !container) return;
-                const myDiv = document.createElement("div");
-                myDiv.id = id;
-                myDiv.style.cssText = `
-                  padding: 15px;
-                  margin: 10px 0;
-                  text-align: center;
-                  border: 1px dashed #555;
-                  color: #aaa;
-                  font-size: 14px;
-                  border-radius: 8px;
-                  background: rgba(255,255,255,0.05);
-                `;
-                myDiv.innerText = "--- TESTBEREICH ---";
-                container.after(myDiv);
-                return;
-              }
-
-              if (existing) existing.remove();
-            },
-          });
-        });
       });
     }
   }, []);
@@ -91,69 +41,52 @@ function App() {
     if (
       typeof chrome !== "undefined" &&
       chrome.tabs?.query &&
-      chrome.scripting?.executeScript &&
-      chrome.storage?.local
+      chrome.scripting?.executeScript
     ) {
       try {
         const [activeTab] = await chrome.tabs.query({
           active: true,
           currentWindow: true,
         });
-        if (!activeTab?.id || !activeTab?.url) {
+        if (!activeTab?.id) {
           setStatus("Kein aktiver Tab gefunden.");
           return;
         }
 
-        const key = buildStateKey(activeTab.url);
-        const current = await new Promise((resolve) =>
-          chrome.storage.local.get([key], (data) =>
-            resolve(Boolean(data[key])),
-          ),
-        );
-        const next = !current;
-
         const [{ result }] = await chrome.scripting.executeScript({
           target: { tabId: activeTab.id },
-          args: [next],
-          func: (isEnabled) => {
+          func: () => {
             const id = "my-test-separator";
             const existing = document.getElementById(id);
             const container = document.querySelector(".gems-list-container");
 
-            if (isEnabled) {
-              if (existing) return "exists";
-              if (!container) return "missing-container";
-              const myDiv = document.createElement("div");
-              myDiv.id = id;
-              myDiv.style.cssText = `
-                padding: 15px;
-                margin: 10px 0;
-                text-align: center;
-                border: 1px dashed #555;
-                color: #aaa;
-                font-size: 14px;
-                border-radius: 8px;
-                background: rgba(255,255,255,0.05);
-              `;
-              myDiv.innerText = "--- TESTBEREICH ---";
-              container.after(myDiv);
-              return "inserted";
+            if (existing) {
+              existing.remove();
+              return "removed";
             }
 
-            if (!existing) return "missing-separator";
-            existing.remove();
-            return "removed";
+            if (!container) return "missing-container";
+
+            const myDiv = document.createElement("div");
+            myDiv.id = id;
+            myDiv.style.cssText = `
+              padding: 15px;
+              margin: 10px 0;
+              text-align: center;
+              border: 1px dashed #555;
+              color: #aaa;
+              font-size: 14px;
+              border-radius: 8px;
+              background: rgba(255,255,255,0.05);
+            `;
+            myDiv.innerText = "--- TESTBEREICH ---";
+            container.after(myDiv);
+            return "inserted";
           },
         });
 
-        await new Promise((resolve) =>
-          chrome.storage.local.set({ [key]: next }, resolve),
-        );
-
-        if (result === "inserted" || result === "exists")
-          setStatus("TestInjection: aktiv & gespeichert.");
-        else if (result === "removed" || result === "missing-separator")
-          setStatus("TestInjection: deaktiviert & gespeichert.");
+        if (result === "inserted") setStatus("TestInjection: eingefügt.");
+        else if (result === "removed") setStatus("TestInjection: entfernt.");
         else setStatus("TestInjection: .gems-list-container nicht gefunden.");
         return;
       } catch (err) {
