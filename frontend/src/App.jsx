@@ -35,8 +35,7 @@ function App() {
     } catch (err) {
       // Fallback ohne Extension APIs
       const result = createFolderSpace(document, { toggle: true });
-      if (result === "inserted")
-        setStatus("FolderSpaceInjection: eingefügt.");
+      if (result === "inserted") setStatus("FolderSpaceInjection: eingefügt.");
       else if (result === "removed")
         setStatus("FolderSpaceInjection: entfernt.");
       else if (result === "exists")
