@@ -12,14 +12,27 @@
       "128": "icon.png"
     }
   },
-  "permissions": ["storage", "activeTab", "scripting"],
+  "permissions": ["storage", "activeTab", "scripting", "tabs"],
   "host_permissions": [
     "https://gemini.google.com/*",
     "https://gemini.googleusercontent.com/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "https://gemini.google.com/*",
+        "https://gemini.googleusercontent.com/*"
+      ],
+      "js": ["autoFolderInit.js"],
+      "run_at": "document_idle"
+    }
   ],
   "icons": {
     "16": "icon.png",
     "48": "icon.png",
     "128": "icon.png"
+  },
+  "background": {
+    "service_worker": "background.js"
   }
 }

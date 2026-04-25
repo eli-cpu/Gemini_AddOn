@@ -62,6 +62,9 @@ function App() {
               Create Folder
             </button>
 
+            <p className="status">
+              Auto: Folderbereich wird per Content Script beim Laden erstellt (Tab neu laden).
+            </p>
             {status && <p className="status">{status}</p>}
           </>
         )}
