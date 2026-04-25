@@ -2,46 +2,10 @@ import { useState } from "react";
 import "./App.css";
 import SortPage from "./pages/sortPage";
 import AddFolderPage from "./pages/addFolderPage";
-import { createFolderSpace } from "./scripts/injectFolder";
 import { enableFolderDragDrop } from "./scripts/folderDragDrop";
 import { executeInActiveTab } from "./scripts/executeInActiveTab";
-
-const bindFolderOutsideActiveSync = () => {
-  const DROP_ZONE_ID = "gemini-folder-drop-zone";
-  const ITEM_CLASS = "conversation-items-container";
-  const ACTIVE_CLASS = "ga-folder-active";
-
-  const dropZone = document.getElementById(DROP_ZONE_ID);
-  if (!dropZone) return "missing-dropzone";
-
-  const clearFolderActive = () => {
-    dropZone
-      .querySelectorAll(`.${ITEM_CLASS}.${ACTIVE_CLASS}`)
-      .forEach((el) => el.classList.remove(ACTIVE_CLASS));
-  };
-
-  if (!document.body.dataset.gaFolderOutsideSyncBound) {
-    document.body.dataset.gaFolderOutsideSyncBound = "1";
-
-    document.addEventListener(
-      "click",
-      (e) => {
-        const target = e.target instanceof Element ? e.target : null;
-        if (!target) return;
-
-        const clickedChat = target.closest(`.${ITEM_CLASS}`);
-        if (!clickedChat) return;
-
-        if (!dropZone.contains(clickedChat)) {
-          clearFolderActive();
-        }
-      },
-      true,
-    );
-  }
-
-  return "bound";
-};
+import { bindFolderOutsideActiveSync } from "./scripts/bindFolderOutsideActiveSync";
+import { createCollapsibleFolder } from "./scripts/createCollapsibleFolder";
 
 function App() {
   const [status, setStatus] = useState("");
@@ -64,25 +28,16 @@ function App() {
     }
   };
 
-  const handleFolderSpaceInjection = async () => {
+  const handleCreateFolder = async () => {
     try {
-      const result = await executeInActiveTab(createFolderSpace);
-
-      if (result === "inserted") setStatus("FolderSpaceInjection: eingefügt.");
-      else if (result === "removed")
-        setStatus("FolderSpaceInjection: entfernt.");
-      else
-        setStatus("FolderSpaceInjection: .gems-list-container nicht gefunden.");
+      const result = await executeInActiveTab(createCollapsibleFolder);
+      if (result === "created") setStatus("Folder erstellt.");
+      else if (result === "missing-dropzone")
+        setStatus("Bitte zuerst 'Drag & Drop aktivieren'.");
+      else if (result === "cancelled") setStatus("Erstellung abgebrochen.");
+      else setStatus("Folder konnte nicht erstellt werden.");
     } catch (err) {
-      // Fallback ohne Extension APIs
-      const result = createFolderSpace(document, { toggle: true });
-      if (result === "inserted") setStatus("FolderSpaceInjection: eingefügt.");
-      else if (result === "removed")
-        setStatus("FolderSpaceInjection: entfernt.");
-      else if (result === "exists")
-        setStatus("FolderSpaceInjection: bereits vorhanden.");
-      else
-        setStatus("FolderSpaceInjection: .gems-list-container nicht gefunden.");
+      setStatus(err?.message || `Injection-Fehler: ${err}`);
     }
   };
 
@@ -103,12 +58,15 @@ function App() {
               Drag & Drop aktivieren
             </button>
 
+            <button className="counter" onClick={handleCreateFolder}>
+              Create Folder
+            </button>
+
             {status && <p className="status">{status}</p>}
           </>
         )}
 
         {page === "sort" && <SortPage onBack={() => setPage("home")} />}
-
         {page === "addFolder" && (
           <AddFolderPage onBack={() => setPage("home")} />
         )}
