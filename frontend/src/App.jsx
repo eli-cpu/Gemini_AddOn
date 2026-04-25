@@ -30,6 +30,15 @@ function App() {
 
   const handleCreateFolder = async () => {
     try {
+      const dragDropResult = await executeInActiveTab(enableFolderDragDrop);
+
+      if (dragDropResult === "no-items") {
+        setStatus("Keine .conversation-items-container gefunden.");
+        return;
+      }
+
+      await executeInActiveTab(bindFolderOutsideActiveSync);
+
       const result = await executeInActiveTab(createCollapsibleFolder);
       if (result === "created") setStatus("Folder erstellt.");
       else if (result === "missing-dropzone")
@@ -46,26 +55,17 @@ function App() {
       <section className="card">
         {page === "home" && (
           <>
-            {/*
-            <button className="counter" onClick={() => setPage("sort")}>
-              Zur Sortier-Seite
-            </button>
-
-            <button className="counter" onClick={() => setPage("addFolder")}>
-              Zur Ordner-/DOM-Seite
-            </button>
-
             <button className="counter" onClick={handleTestInjection}>
               Drag & Drop aktivieren
-            </button>*/}
+            </button>
 
             <button className="counter" onClick={handleCreateFolder}>
               Create Folder
             </button>
 
             <p className="status">
-              Auto: Folderbereich wird per Content Script beim Laden erstellt
-              (Tab neu laden).
+              Auto: Beim Erstellen eines Ordners wird Drag & Drop zuerst
+              aktiviert.
             </p>
             {status && <p className="status">{status}</p>}
           </>

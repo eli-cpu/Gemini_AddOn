@@ -13,7 +13,7 @@ Eine Chrome-Extension für Google Gemini, die es ermöglicht, Chats in Ordnern z
 - **Active-State Management**: Nur ein Chat pro Sektion ist aktiv; Klicks auf externe Chats deaktivieren Folder-Einträge
 - **Chat-Öffnung**: Klick auf einen Chat im Folder öffnet ihn automatisch
 
-### 🔧 Bedienung
+## 🔧 Bedienung
 
 1. **Extension laden**:
    - Im Browser zu `chrome://extensions` gehen
@@ -22,7 +22,8 @@ Eine Chrome-Extension für Google Gemini, die es ermöglicht, Chats in Ordnern z
 
 2. **Folder-Bereich nutzen**:
    - Beim Öffnen von [Gemini](https://gemini.google.com) wird automatisch der "Folders"-Bereich unter den Chats erstellt
-   - Button **"Drag & Drop aktivieren"** klicken (falls nicht automatisch aktiv)
+   - Button **"Drag & Drop aktivieren"** klicken, falls es noch nicht aktiv ist
+   - Alternativ einfach **"Create Folder"** klicken: Drag & Drop wird dabei automatisch aktiviert
 
 3. **Ordner erstellen**:
    - Button **"Create Folder"** klicken
@@ -35,14 +36,14 @@ Eine Chrome-Extension für Google Gemini, die es ermöglicht, Chats in Ordnern z
    - Auf einen Chat im Folder klicken → wird aktiv (blau hinterlegt)
    - Auf externen Chat klicken → deaktiviert alle Folder-Einträge
 
-### 📋 Tech-Stack
+## 📋 Tech-Stack
 
 - **React** (Frontend für Popup)
 - **Chrome Extension APIs** (Manifest V3)
 - **Content Scripts** (Auto-Injection bei Gemini-Laden)
 - **Drag & Drop API** (HTML5 Standard)
 
-### 📁 Projektstruktur
+## 📁 Projektstruktur
 
 ```
 frontend/
