@@ -46,6 +46,7 @@ function App() {
       <section className="card">
         {page === "home" && (
           <>
+            {/*
             <button className="counter" onClick={() => setPage("sort")}>
               Zur Sortier-Seite
             </button>
@@ -56,7 +57,7 @@ function App() {
 
             <button className="counter" onClick={handleTestInjection}>
               Drag & Drop aktivieren
-            </button>
+            </button>*/}
 
             <button className="counter" onClick={handleCreateFolder}>
               Create Folder
