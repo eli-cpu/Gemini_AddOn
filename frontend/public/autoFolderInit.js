@@ -43,7 +43,10 @@
   const observer = new MutationObserver(() => {
     ensureFolderArea();
   });
-  observer.observe(document.documentElement, { childList: true, subtree: true });
+  observer.observe(document.documentElement, {
+    childList: true,
+    subtree: true,
+  });
 
   setTimeout(() => observer.disconnect(), 60000);
 })();
