@@ -7,6 +7,7 @@ Eine Chrome-Extension für Google Gemini, die es ermöglicht, Chats in Ordnern z
 ### ✅ Implementiert
 
 - **Automatischer Folder-Bereich**: Beim Laden von Gemini wird automatisch ein "Folders"-Bereich erstellt
+- **Persistierung**: Folder-Inhalt wird in `chrome.storage.local` gespeichert und beim Laden wiederhergestellt
 - **Drag & Drop**: Chats können in den Folder-Bereich oder direkt in Ordner gezogen werden
 - **Einklappbare Ordner**: Ordner können auf- und zugeklappt werden (> wenn eingeklappt, ⌄ wenn ausgeklappt)
 - **Chat-Verwaltung in Ordnern**: Gezogene Chats bleiben im Ordner und behalten ihr Design
@@ -66,7 +67,6 @@ frontend/
 
 ### ⚠️ Bekannte Limitationen
 
-- **Keine Persistierung**: Ordner und angeordnete Chats werden nicht gespeichert (Seite neu laden = Reset)
 - **Keine KI-Sortierung**: Ordner müssen manuell erstellt und gefüllt werden
 - **Nur Ordnerung**: Keine automatische Kategorisierung oder intelligente Organisation
 
