@@ -1,100 +1,83 @@
 import { useState } from "react";
-import { getConversations } from "../scripts/getChats";
-import { sortChats } from "../scripts/sortChats";
+import { getActiveGeminiTab } from "../lib/tabs";
+import { Icon, PageHeader, Status } from "../components/ui";
 
+// KI-Sortierung: the actual work happens in the background service worker
+// so it keeps running if the popup closes.
 function SortPage({ onBack }) {
-  const [status, setStatus] = useState("");
+  const [status, setStatus] = useState({ text: "", tone: "neutral" });
+  const [busy, setBusy] = useState(false);
+  const [onlyUnsorted, setOnlyUnsorted] = useState(true);
+  const [maxChats, setMaxChats] = useState(100);
 
-  const readConversationsForTests = async () => {
-    if (
-      typeof chrome !== "undefined" &&
-      chrome.tabs?.query &&
-      chrome.scripting?.executeScript
-    ) {
-      const [tab] = await chrome.tabs.query({
-        active: true,
-        currentWindow: true,
-      });
-
-      if (!tab?.id) {
-        throw new Error("Kein aktiver Tab gefunden.");
-      }
-
-      const [result] = await chrome.scripting.executeScript({
-        target: { tabId: tab.id },
-        func: () => {
-          const list = document.getElementById("conversations-list-0");
-          if (!list) return [];
-          const items = list.querySelectorAll(
-            ".conversation-items-container, .conversations-items-container",
-          );
-          return Array.from(items).map((container) => ({
-            text: container.textContent?.trim() || "",
-            html: container.innerHTML,
-          }));
-        },
-      });
-
-      return result?.result || [];
-    }
-
-    return getConversations().map(({ text, html }) => ({ text, html }));
-  };
-
-  const handleTestGetConversations = async () => {
-    setStatus("");
+  const handleSort = async () => {
+    setBusy(true);
+    setStatus({ text: "Gemini sortiert deine Chats …", tone: "neutral" });
     try {
-      const conversations = await readConversationsForTests();
-      console.log("Conversations:", conversations);
-      setStatus(`${conversations.length} Chats gefunden.`);
-    } catch (error) {
-      console.error(error);
-      setStatus("Test fehlgeschlagen.");
-    }
-  };
-
-  const handleTestSortChats = async (label = "sortChats") => {
-    setStatus("");
-    try {
-      const conversations = await readConversationsForTests();
-      const sorted = sortChats([...conversations]) ?? conversations;
-      console.log(`${label} input:`, conversations);
-      console.log(`${label} output:`, sorted);
-      setStatus(`${label}-Test ok (${sorted.length} Chats).`);
-    } catch (error) {
-      console.error(error);
-      setStatus(`${label}-Test fehlgeschlagen.`);
+      const tab = await getActiveGeminiTab();
+      const result = await chrome.runtime.sendMessage({
+        type: "ga:ai-sort",
+        tabId: tab.id,
+        options: { onlyUnsorted, maxChats: Number(maxChats) || 100 },
+      });
+      if (!result?.ok) throw new Error(result?.error || "Unbekannter Fehler.");
+      setStatus({ text: result.message, tone: "success" });
+    } catch (err) {
+      setStatus({ text: err?.message || String(err), tone: "error" });
+    } finally {
+      setBusy(false);
     }
   };
 
   return (
     <>
-      <h1>Sortierung</h1>
-      <p className="subline">Tests für Chat-Erkennung und Sortierung</p>
+      <PageHeader
+        title="KI-Sortierung"
+        subtitle="Geladene Chats thematisch einsortieren"
+        onBack={onBack}
+      />
 
-      <button className="counter" onClick={handleTestGetConversations}>
-        Test: getConversations
+      <div className="card">
+        <label className="switch">
+          <span>Nur Chats ohne Ordner</span>
+          <input
+            type="checkbox"
+            checked={onlyUnsorted}
+            onChange={(e) => setOnlyUnsorted(e.target.checked)}
+          />
+          <span className="switch-track" aria-hidden="true" />
+        </label>
+
+        <div className="field-row">
+          <label htmlFor="max-chats">Maximal sortieren</label>
+          <input
+            id="max-chats"
+            className="input number-input"
+            type="number"
+            min={1}
+            max={500}
+            value={maxChats}
+            onChange={(e) => setMaxChats(e.target.value)}
+          />
+        </div>
+      </div>
+
+      <p className="tip">
+        <Icon name="sparkle" size={16} />
+        <span>
+          Es werden nur Chats berücksichtigt, die Gemini in der Seitenleiste
+          geladen hat. Die Titel werden an die Gemini-API gesendet.
+        </span>
+      </p>
+
+      {busy && <div className="progress" aria-hidden="true" />}
+
+      <button className="btn btn-primary btn-block" onClick={handleSort} disabled={busy}>
+        <Icon name="sparkle" size={18} />
+        {busy ? "Sortiere …" : "Jetzt sortieren"}
       </button>
 
-      <button
-        className="counter"
-        onClick={() => handleTestSortChats("sortChats")}
-      >
-        Test: sortChats
-      </button>
-
-      <button
-        className="counter"
-        onClick={() => handleTestSortChats("Extra sortChats")}
-      >
-        Test: sortChats (extra)
-      </button>
-
-      <button className="counter" onClick={onBack}>
-        Zurück
-      </button>
-
-      {status && <p className="status">{status}</p>}
+      <Status tone={status.tone}>{status.text}</Status>
     </>
   );
 }
