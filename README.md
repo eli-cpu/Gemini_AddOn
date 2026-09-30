@@ -1,89 +1,111 @@
 # Gemini AddOn
 
-Eine Chrome-Extension für Google Gemini, die es ermöglicht, Chats in Ordnern zu organisieren und per Drag & Drop zu verwalten.
+Chrome-Extension für [Google Gemini](https://gemini.google.com), mit der du Chats in Ordnern organisierst – per Drag & Drop, manuell beim ersten Prompt oder automatisch per KI.
+
+> Inoffizielles Projekt, nicht mit Google verbunden. „Gemini“ ist eine Marke von Google LLC.
 
 ## Features
 
-### ✅ Implementiert
+**In Gemini (Seitenleiste)**
+- **Folders-Bereich** in der Seitenleiste, einklappbar, passt sich an helles/dunkles Theme an. Erscheint nur in der Seitenleiste – auch auf „Chats durchsuchen“.
+- **Drag & Drop** ist immer aktiv: Chats aus der Seitenleiste oder aus den Suchergebnissen auf „Folders“ oder direkt auf einen Ordner ziehen; auch zwischen Ordnern.
+- **Ordner** auf- und zuklappen, umbenennen und löschen direkt in der Liste; Chats per **×** wieder entfernen.
+- **Einsortierte Chats** werden in der normalen Chat-Liste ausgeblendet, bleiben in der **Suche** aber immer sichtbar.
+- **Aktiver Chat** ist im Folders-Bereich hervorgehoben; Klick öffnet den Chat.
 
-- **Automatischer Folder-Bereich**: Beim Laden von Gemini wird automatisch ein "Folders"-Bereich erstellt
-- **Persistierung**: Folder-Inhalt wird in `chrome.storage.local` gespeichert und beim Laden wiederhergestellt
-- **Drag & Drop**: Chats können in den Folder-Bereich oder direkt in Ordner gezogen werden
-- **Einklappbare Ordner**: Ordner können auf- und zugeklappt werden (> wenn eingeklappt, ⌄ wenn ausgeklappt)
-- **Chat-Verwaltung in Ordnern**: Gezogene Chats bleiben im Ordner und behalten ihr Design
-- **Active-State Management**: Nur ein Chat pro Sektion ist aktiv; Klicks auf externe Chats deaktivieren Folder-Einträge
-- **Chat-Öffnung**: Klick auf einen Chat im Folder öffnet ihn automatisch
+**Beim neuen Chat (Eingabeleiste)**
+- **Ordner-Button** links neben „Flash/Pro“. Menü:
+  - *Manuell*: Kein Ordner, vorhandener Ordner oder **Neuer Ordner …** (Namen direkt eintippen)
+  - *Mit KI*: **Automatisch (KI)** – Ordner wird beim Senden gewählt; **Jetzt vorschlagen** – Vorschlag anhand der eingegebenen Nachricht
+- Nach dem Senden wird der Chat automatisch einsortiert.
 
-## 🔧 Bedienung
+**Popup**
+- Ordner erstellen, Verbindungsstatus zum Gemini-Tab
+- **KI aktivieren / KI & API-Key**: eigenen Gemini-API-Key eintragen (wird vor dem Speichern geprüft), ersetzen oder entfernen
+- **KI-Sortierung**: alle geladenen Chats thematisch in bestehende oder neue Ordner einsortieren
+- **Ordner verwalten**: umbenennen, löschen, Chats entfernen
+- **Einstellungen**: maximale Anzahl Ordner, automatisches Löschen von Ordnern nach X Tagen ohne Änderung
 
-1. **Extension laden**:
-   - Im Browser zu `chrome://extensions` gehen
-   - Entwicklermodus aktivieren
-   - Ordner laden (untitled)
+**Ohne API-Key** sind alle KI-Funktionen ausgeblendet (KI-Sortierung, „Automatisch (KI)“, „Jetzt vorschlagen“). Ordner, Drag & Drop und die manuelle Ordnerwahl funktionieren immer.
 
-2. **Folder-Bereich nutzen**:
-   - Beim Öffnen von [Gemini](https://gemini.google.com) wird automatisch der "Folders"-Bereich unter den Chats erstellt
-   - Button **"Drag & Drop aktivieren"** klicken, falls es noch nicht aktiv ist
-   - Alternativ einfach **"Create Folder"** klicken: Drag & Drop wird dabei automatisch aktiviert
+**Speicherung**: Alles liegt lokal in `chrome.storage.local` (als Daten, nicht HTML) und ist nach einem Neuladen identisch. Ältere Speicherstände werden automatisch migriert.
 
-3. **Ordner erstellen**:
-   - Button **"Create Folder"** klicken
-   - Namen eingeben
-   - Ordner erscheint unter "Folders"
+## Installation
 
-4. **Chats organisieren**:
-   - Chat in den "Folders"-Bereich ziehen → wird unterhalb der Ordner gespeichert
-   - Chat auf einen Ordner ziehen → wird darunter eingefügt und der Ordner öffnet sich
-   - Auf einen Chat im Folder klicken → wird aktiv (blau hinterlegt)
-   - Auf externen Chat klicken → deaktiviert alle Folder-Einträge
+Es gibt (noch) kein fertiges Paket – die Extension wird aus dem Quellcode gebaut.
 
-## 📋 Tech-Stack
+**Voraussetzungen**: Node.js ≥ 20.19 (oder ≥ 22.12), ein Chromium-Browser (Chrome, Edge, Brave …), optional ein kostenloser [Gemini-API-Key](https://aistudio.google.com/apikey) für die KI-Funktionen.
 
-- **React** (Frontend für Popup)
-- **Chrome Extension APIs** (Manifest V3)
-- **Content Scripts** (Auto-Injection bei Gemini-Laden)
-- **Drag & Drop API** (HTML5 Standard)
+```bash
+git clone https://github.com/eli-cpu/Gemini_AddOn.git
+cd Gemini_AddOn/frontend
+npm ci
+npm run build
+```
 
-## 📁 Projektstruktur
+Dann im Browser:
+1. `chrome://extensions` öffnen und den **Entwicklermodus** aktivieren
+2. **Entpackte Erweiterung laden** → den Ordner **`frontend/dist`** wählen (nicht `frontend`!)
+3. Gemini-Tab neu laden (F5)
+
+Nach Code-Änderungen: `npm run build`, dann auf der Extension-Karte auf **Neu laden** klicken und den Gemini-Tab neu laden.
+
+### KI-Funktionen aktivieren
+
+1. Kostenlosen Key in [Google AI Studio](https://aistudio.google.com/apikey) erstellen
+2. Popup öffnen → **KI aktivieren** → Key einfügen → **Speichern**
+3. Die KI-Funktionen erscheinen sofort – im Popup und im Ordner-Menü in Gemini
+
+Der Key wird nur lokal im Browser gespeichert und nie in den Build eingebettet. Entfernen: Popup → **KI & API-Key** → **Entfernen**.
+
+### Optionale Entwickler-Konfiguration (`.env` im Repository-Root)
+
+| Variable | Beschreibung |
+|---|---|
+| `GEMINI_MODEL` | Modell für die KI-Funktionen (Build-Zeit), Standard `gemini-flash-lite-latest` |
+| `GEMINI_API_KEY` | nur für das Testskript `node src/scripts/testAPI.js` (Modelle auflisten: `--models`) – wird **nicht** von der Extension verwendet |
+
+## Datenschutz
+
+Ordner, Chat-Titel und dein API-Key bleiben lokal im Browser. Nur bei den KI-Funktionen werden Daten mit deinem eigenen API-Key direkt an die Gemini-API gesendet:
+- **KI-Sortierung**: die Titel der sortierten Chats und die Ordnernamen
+- **Automatisch (KI)** / **Jetzt vorschlagen**: die erste Nachricht des neuen Chats und die Ordnernamen
+
+Details: [PRIVACY.md](PRIVACY.md)
+
+## Hinweise & Limitationen
+
+- **API-Key-Speicherung**: Der Key liegt unverschlüsselt in `chrome.storage.local` deines Browser-Profils (wie bei Browser-Extensions üblich). Webseiten können ihn nicht lesen, andere Programme mit Zugriff auf dein Benutzerprofil schon.
+- **Gemini-DOM**: Die Extension liest die Gemini-Oberfläche (Chat-Links `/app/<id>`, `bard-sidenav`, `bard-mode-switcher` …). Ändert Google das Layout, können Teile ausfallen – bitte dann ein [Issue](https://github.com/eli-cpu/Gemini_AddOn/issues) mit dem HTML-Ausschnitt eröffnen.
+- **KI-Sortierung** sieht nur Chats, die Gemini in der Seitenleiste bzw. Suche bereits geladen hat (ggf. vorher runterscrollen).
+- **Mehrere Google-Konten** im selben Browser-Profil teilen sich dieselben Ordner.
+- Gelöschte Ordner löschen keine Chats in Gemini – die Chats erscheinen nur wieder in der normalen Liste.
+
+## Entwicklung
+
+```bash
+cd frontend
+npm run lint     # ESLint
+npm run build    # Build nach frontend/dist
+```
+
+Aufbau, Konventionen und Stolperfallen stehen in [AGENT.md](AGENT.md); Beiträge siehe [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ```
+.env.example                     # Vorlage für .env
 frontend/
 ├── public/
-│   ├── manifest.json          # Extension-Manifest
-│   ├── autoFolderInit.js      # Auto-Init per Content Script
-│   └── background.js          # Service Worker (optional)
-├── src/
-│   ├── App.jsx                # Haupt-UI
-│   ├── scripts/
-│   │   ├── folderDragDrop.js  # Drag & Drop-Logik
-│   │   ├── createCollapsibleFolder.js # Ordner-Erstellung
-│   │   ├── bindFolderOutsideActiveSync.js # Active-State Management
-│   │   ├── executeInActiveTab.js # Chrome API Utility
-│   │   └── background.js      # Utility-Funktionen
-│   └── pages/
-│       ├── sortPage.jsx       # (TODO: Sortierung)
-│       └── addFolderPage.jsx  # (TODO: Ordner-Verwaltung)
+│   ├── manifest.json            # Manifest V3
+│   └── autoFolderInit.js        # Content Script (Folders-Bereich, Drag & Drop, Ordner-Button)
+└── src/
+    ├── App.jsx                  # Popup-Startseite
+    ├── background.js            # Service Worker: KI-Sortierung, Ordner-Vorschlag
+    ├── components/              # UI-Bausteine (Icons, Dialog)
+    ├── lib/                     # storage.js, gemini.js, tabs.js, useApiKey.js
+    ├── pages/                   # KI-Sortierung, Ordner verwalten, Einstellungen, API-Key
+    └── scripts/testAPI.js       # API-Key-Test (Node)
 ```
 
-### ⚠️ Bekannte Limitationen
+## Lizenz
 
-- **Keine KI-Sortierung**: Ordner müssen manuell erstellt und gefüllt werden
-- **Nur Ordnerung**: Keine automatische Kategorisierung oder intelligente Organisation
-
-### 🚀 Nächste Schritte (TODO)
-
-- [ ] **Speicherung**: Ordner-Struktur per `chrome.storage.local` persistieren
-- [ ] **KI-Sortierung**: Chats automatisch kategorisieren
-- [ ] **Sortier-Seite**: UI für erweiterte Ordner-Verwaltung
-- [ ] **Einstellungen**: Maximal-Anzahl Ordner, Auto-Delete nach Datum
-- [ ] **Icons**: Ordner-Icons, Delete-Buttons
-
-### 🔗 Links
-
-- [Google Gemini](https://gemini.google.com)
-- [Chrome Extension Docs](https://developer.chrome.com/docs/extensions/)
-
----
-
-**Version**: 1.0.0  
-**Lizenz**: MIT
+[MIT](LICENSE)

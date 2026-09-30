@@ -1,0 +1,91 @@
+# AGENT.md
+
+Guide for AI coding agents (and humans) working on this repo. Read this before changing code.
+
+## What this is
+
+A Manifest V3 Chrome extension that adds folders to the Google Gemini web app (`gemini.google.com`). UI text is **German**; code comments are English.
+
+Three runtimes, all in `frontend/`:
+
+| Runtime | Source | Built to | Notes |
+|---|---|---|---|
+| Content script | `public/autoFolderInit.js` | copied as-is to `dist/` | Plain JS IIFE, **no imports, no build step**. Runs on every Gemini page. |
+| Service worker | `src/background.js` | `dist/background.js` (ES module) | AI sorting + folder suggestion. Bundled by Vite. |
+| Popup | `index.html`, `src/App.jsx`, `src/pages/*` | `dist/index.html`, `dist/assets/*` | React 19. 360px wide. |
+
+## Commands
+
+Run from `frontend/`:
+
+```bash
+npm ci
+npm run lint     # must pass (0 errors)
+npm run build    # outputs dist/ – load this folder in chrome://extensions
+node src/scripts/testAPI.js   # dev-only: checks GEMINI_API_KEY from ../.env (the extension doesn't use it)
+```
+
+There is no test framework in the repo. For content-script logic, a throwaway jsdom harness works well (load `dist/autoFolderInit.js` into a `JSDOM` with `runScripts: "outside-only"` and a fake `chrome.storage`/`chrome.runtime`). Don't commit such harnesses unless a real test setup is added.
+
+## Architecture
+
+**State** lives in `chrome.storage.local`:
+- `ga_folders_state_v3`: `{ version: 3, collapsed, folders: [{ id, name, expanded, createdAt, updatedAt, chats: [{ key, title, href }] }], looseChats: [...] }`
+- `ga_settings_v1`: `{ maxFolders, autoDeleteDays }`
+- `ga_api_key_v1`: the user's Gemini API key (string). Written only by the popup (`saveApiKey`/`removeApiKey` in `lib/storage.js`, validated with `verifyApiKey` first). Read by the background for requests; the content script only checks whether it is non-empty (`aiEnabled`).
+- Chat `key` is `id:<conversationId>` (from `/app/<id>` links), fallback `title:<title>`.
+- Legacy keys `ga_folders_state_v2` / `ga_folders_html_v1` are migrated once by the content script.
+
+**The state shape and normalizers are duplicated** in `public/autoFolderInit.js` and `src/lib/storage.js` (the content script can't import). Change both together.
+
+**Data flow**: every writer (popup, background, content script) writes the whole state; the content script listens to `storage.onChanged` and re-renders. It ignores echoes of its own writes via the `pendingSaves` snapshot list.
+
+**Messages**:
+- Popup → content script: `ga:ping`, `ga:refresh` (returns `{ mounted, nativeCount }`), `ga:get-chats`
+- Popup/content → background: `ga:ai-sort` `{ tabId, options }`, `ga:suggest-folder` `{ prompt }`
+- `src/lib/tabs.js#sendToTab` injects the content script first if the tab doesn't have it.
+
+**Gemini API**: `src/lib/gemini.js`, REST `generateContent` with `responseSchema` (structured JSON). Every request function takes `{ apiKey }`; the background loads it via `requireApiKey()`. Only the model can be set at build time (`GEMINI_MODEL`, `vite.config.js`: `envPrefix: ["VITE_", "GEMINI_MODEL"]`). **Never expose `GEMINI_API_KEY` to the bundle** – don't widen `envPrefix` to `GEMINI_`.
+
+**AI gating**: without a saved key, every AI feature must be invisible, not just disabled:
+- Popup: `useApiKey()` (`src/lib/useApiKey.js`); the KI-Sortierung menu entry and page only render with a key, otherwise a "KI aktivieren" entry leads to `apiKeyPage.jsx`.
+- Content script: `aiEnabled` (updated live via `storage.onChanged`); the "Mit KI" section of the folder menu is omitted and AI-only choices (`__auto__`, AI-suggested new folder) are reset in `validateChoice()`.
+- Background: `requireApiKey()` rejects AI messages as a last line of defence.
+New AI features must follow the same three layers.
+
+## Content script rules (important)
+
+- **Gemini's DOM is unstable.** All selectors are constants at the top of `autoFolderInit.js` (`CHAT_LINK_SELECTOR`, `SIDEBAR_ROOT_SELECTOR`, `TOOLBAR_ANCHOR_SELECTORS`, `EDITOR_SELECTOR`, `SEND_BUTTON_SELECTOR`, …). Detect chats by their link `a[href*="/app/<id>"]`, not by class names. Add fallbacks instead of replacing selectors.
+- **Only mount in the sidebar.** The Folders section must never land in the main content (search page). `getSidebarRoot()` rejects candidates that contain `main`/`chat-window`.
+- **Hide foldered chats only in the sidebar** (`ga-hidden-original`), never in search results.
+- `ensure()` runs (throttled, 200 ms) on every DOM mutation. Anything it calls must be **idempotent and cheap**, and must not re-render UI that the user is interacting with (see `menuSignature()` / `editing` guards). Otherwise focus and typed text get lost.
+- No `innerHTML` for dynamic content (Trusted Types, XSS). Build SVG via `createElementNS` (`svgIcon()`), text via `textContent`.
+- Stop `keydown` propagation in our inputs/menus so Gemini's shortcuts don't fire.
+- After an extension reload, old instances are orphaned: guard `chrome.*` calls with `selfAlive()` and register teardown functions in `cleanups`.
+- Scope all CSS under `#gemini-folder-drop-zone`, `#ga-new-chat-folder-picker`, `.ga-picker-menu`, `#ga-toast`. Use the `--ga-*` custom properties; light theme via `:root[data-ga-theme="light"]`.
+
+## Popup rules
+
+- Don't use `window.confirm/alert/prompt` – Chrome draws them larger than the popup and they get cut off. Use `useConfirm()` (`src/components/useConfirm.jsx`).
+- Shared UI in `src/components/ui.jsx` (`Icon`, `IconButton`, `PageHeader`, `Status`, `ConfirmDialog`). Theme tokens in `src/index.css`.
+- ESLint `react-refresh/only-export-components`: files exporting components must not export hooks/constants.
+- ESLint `react-hooks/set-state-in-effect`: don't call `setState` synchronously in an effect body.
+
+## Conventions
+
+- German for all user-facing strings; keep tone short and friendly.
+- Accessibility: real `<button>`s, `aria-label` on icon buttons, `aria-expanded`/`aria-checked` on toggles/menus, visible `:focus-visible`, keyboard support (Enter/Space/Esc/arrows) for custom menus.
+- Pin new dependencies to exact versions. Avoid new dependencies for small things.
+
+## Security & privacy
+
+- **Never commit `.env`**. The API key lives only in `chrome.storage.local` (entered by the user); builds must not contain one – check with `grep -rE "AIza[0-9A-Za-z_-]{20,}" frontend/dist` (must be empty). Never log the key or show it unmasked (`maskApiKey`).
+- Only send to the Gemini API what the feature needs (titles, first prompt, folder names) and document any new data flow in `PRIVACY.md` and the README.
+- Keep `host_permissions` minimal (Gemini + `generativelanguage.googleapis.com`).
+
+## Before you finish
+
+1. `npm run lint` and `npm run build` pass.
+2. If you touched the content script: verify mount position, drag & drop, reload (F5) persistence, and the new-chat folder button – at least in a jsdom harness; mention if not tested in a real browser.
+3. If you touched anything AI-related: check both with and without a saved key.
+4. Update README/PRIVACY/AGENT.md if behavior, storage shape, messages or data flows changed.
