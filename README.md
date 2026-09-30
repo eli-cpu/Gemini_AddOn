@@ -75,7 +75,7 @@ Details: [PRIVACY.md](PRIVACY.md)
 
 ## Hinweise & Limitationen
 
-- **API-Key-Speicherung**: Der Key liegt unverschlüsselt in `chrome.storage.local` deines Browser-Profils (wie bei Browser-Extensions üblich). Webseiten können ihn nicht lesen, andere Programme mit Zugriff auf dein Benutzerprofil schon.
+- **API-Key-Speicherung**: Der Key liegt in der IndexedDB der Extension und ist nur für Popup und Service Worker lesbar – nicht für Webseiten, PDFs, andere Extensions oder das Content Script. Wie alle Browser-Daten ist er auf der Festplatte unverschlüsselt; Schadsoftware auf dem Rechner könnte ihn lesen. Details: [SECURITY.md](SECURITY.md).
 - **Gemini-DOM**: Die Extension liest die Gemini-Oberfläche (Chat-Links `/app/<id>`, `bard-sidenav`, `bard-mode-switcher` …). Ändert Google das Layout, können Teile ausfallen – bitte dann ein [Issue](https://github.com/eli-cpu/Gemini_AddOn/issues) mit dem HTML-Ausschnitt eröffnen.
 - **KI-Sortierung** sieht nur Chats, die Gemini in der Seitenleiste bzw. Suche bereits geladen hat (ggf. vorher runterscrollen).
 - **Mehrere Google-Konten** im selben Browser-Profil teilen sich dieselben Ordner.

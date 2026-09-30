@@ -32,7 +32,8 @@ There is no test framework in the repo. For content-script logic, a throwaway js
 **State** lives in `chrome.storage.local`:
 - `ga_folders_state_v3`: `{ version: 3, collapsed, folders: [{ id, name, expanded, createdAt, updatedAt, chats: [{ key, title, href }] }], looseChats: [...] }`
 - `ga_settings_v1`: `{ maxFolders, autoDeleteDays }`
-- `ga_api_key_v1`: the user's Gemini API key (string). Written only by the popup (`saveApiKey`/`removeApiKey` in `lib/storage.js`, validated with `verifyApiKey` first). Read by the background for requests; the content script only checks whether it is non-empty (`aiEnabled`).
+- `ga_ai_enabled_v1`: boolean "an API key is saved". The only AI-related value the content script may read.
+- **The API key itself is NOT in `chrome.storage`** (that area is readable by content scripts, which run in the gemini.google.com renderer). It lives in IndexedDB of the extension origin (`src/lib/secretStore.js`, DB `ga-secrets`), reachable only from the popup and the service worker. Use `saveApiKey`/`loadApiKey`/`removeApiKey` from `lib/storage.js`; they keep the flag in sync. Never pass the key to the content script, never put it in a message response, DOM, log or error text. A key found under the old `ga_api_key_v1` entry is migrated away automatically (`migrateLegacyApiKey`).
 - Chat `key` is `id:<conversationId>` (from `/app/<id>` links), fallback `title:<title>`.
 - Legacy keys `ga_folders_state_v2` / `ga_folders_html_v1` are migrated once by the content script.
 
@@ -49,8 +50,8 @@ There is no test framework in the repo. For content-script logic, a throwaway js
 
 **AI gating**: without a saved key, every AI feature must be invisible, not just disabled:
 - Popup: `useApiKey()` (`src/lib/useApiKey.js`); the KI-Sortierung menu entry and page only render with a key, otherwise a "KI aktivieren" entry leads to `apiKeyPage.jsx`.
-- Content script: `aiEnabled` (updated live via `storage.onChanged`); the "Mit KI" section of the folder menu is omitted and AI-only choices (`__auto__`, AI-suggested new folder) are reset in `validateChoice()`.
-- Background: `requireApiKey()` rejects AI messages as a last line of defence.
+- Content script: `aiEnabled` from the `ga_ai_enabled_v1` flag (must be exactly `true`, updated live via `storage.onChanged`); the "Mit KI" section of the folder menu is omitted and AI-only choices (`__auto__`, AI-suggested new folder) are reset in `validateChoice()`.
+- Background: `requireApiKey()` rejects AI messages as a last line of defence; `isTrustedSender()` only accepts our own extension pages and content scripts on Gemini.
 New AI features must follow the same three layers.
 
 ## Content script rules (important)

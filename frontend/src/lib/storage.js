@@ -2,11 +2,17 @@
 // Keep keys and the state shape in sync with public/autoFolderInit.js
 // (the content script cannot import modules).
 
+import { deleteSecret, getSecret, hasSecretStore, setSecret } from "./secretStore";
+
 export const STATE_KEY = "ga_folders_state_v3";
 export const SETTINGS_KEY = "ga_settings_v1";
-// Gemini API key entered by the user. Stored separately from the settings
-// so it is never part of state/settings payloads.
-export const API_KEY_KEY = "ga_api_key_v1";
+// Boolean flag in chrome.storage.local: "an API key is saved". This is all
+// the content script ever sees – the key itself lives in the extension-only
+// secret store (lib/secretStore.js).
+export const AI_FLAG_KEY = "ga_ai_enabled_v1";
+const API_KEY_SECRET = "geminiApiKey";
+// Old location of the key (readable by content scripts) – migrated away.
+const LEGACY_API_KEY_KEY = "ga_api_key_v1";
 
 export const DEFAULT_SETTINGS = { maxFolders: 10, autoDeleteDays: 0 };
 
@@ -101,20 +107,39 @@ export async function saveSettings(settings) {
   return normalized;
 }
 
+// --- API key (extension pages + service worker only) -----------------------
+
+/** Moves a key saved by older versions out of chrome.storage.local. */
+export async function migrateLegacyApiKey() {
+  if (!hasChrome() || !hasSecretStore()) return;
+  const result = await chrome.storage.local.get([LEGACY_API_KEY_KEY, AI_FLAG_KEY]);
+  const legacy = result[LEGACY_API_KEY_KEY];
+  if (typeof legacy === "string" && legacy.trim()) {
+    if (!(await getSecret(API_KEY_SECRET))) await setSecret(API_KEY_SECRET, legacy.trim());
+  }
+  if (LEGACY_API_KEY_KEY in result) await chrome.storage.local.remove(LEGACY_API_KEY_KEY);
+  // Keep the flag consistent with the secret store.
+  const hasKey = !!(await getSecret(API_KEY_SECRET));
+  if (result[AI_FLAG_KEY] !== hasKey) await chrome.storage.local.set({ [AI_FLAG_KEY]: hasKey });
+}
+
 export async function loadApiKey() {
-  if (!hasChrome()) return "";
-  const result = await chrome.storage.local.get(API_KEY_KEY);
-  return typeof result[API_KEY_KEY] === "string" ? result[API_KEY_KEY].trim() : "";
+  if (!hasChrome() || !hasSecretStore()) return "";
+  await migrateLegacyApiKey();
+  const value = await getSecret(API_KEY_SECRET);
+  return typeof value === "string" ? value.trim() : "";
 }
 
 export async function saveApiKey(key) {
   const value = String(key || "").trim();
   if (!value) throw new Error("Kein API-Key angegeben.");
-  await chrome.storage.local.set({ [API_KEY_KEY]: value });
+  await setSecret(API_KEY_SECRET, value);
+  await chrome.storage.local.set({ [AI_FLAG_KEY]: true });
 }
 
 export async function removeApiKey() {
-  await chrome.storage.local.remove(API_KEY_KEY);
+  await deleteSecret(API_KEY_SECRET);
+  await chrome.storage.local.set({ [AI_FLAG_KEY]: false });
 }
 
 /** "AIza…Wx4k" – enough to recognise the key without showing it. */

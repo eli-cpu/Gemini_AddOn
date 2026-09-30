@@ -8,7 +8,7 @@ In `chrome.storage.local` deines Browser-Profils:
 - Ordnernamen, Zeitstempel (erstellt/geändert) und Auf-/Zuklapp-Zustand
 - pro einsortiertem Chat: Gemini-Chat-ID, Titel und Link
 - Einstellungen (maximale Ordneranzahl, Auto-Löschen)
-- dein Gemini-API-Key, falls du einen einträgst (unverschlüsselt, nur lokal; wird nur als Header an die Gemini API gesendet)
+- dein Gemini-API-Key, falls du einen einträgst – getrennt davon in der IndexedDB der Extension, nur für Popup und Service Worker lesbar (Details: [SECURITY.md](SECURITY.md))
 
 Diese Daten verlassen den Browser nicht (außer dem Key bei KI-Anfragen an Google) und werden beim Entfernen der Extension gelöscht. Den Key kannst du jederzeit im Popup unter „KI & API-Key“ entfernen.
 

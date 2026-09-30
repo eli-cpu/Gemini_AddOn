@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
-import { API_KEY_KEY, loadApiKey } from "./storage";
+import { AI_FLAG_KEY, loadApiKey } from "./storage";
 
 /**
- * Current API key from chrome.storage.local, kept in sync with changes.
+ * Current API key (from the extension-only secret store), reloaded whenever
+ * the "AI enabled" flag in chrome.storage.local changes.
  * Returns { loaded, apiKey, hasKey }.
  */
 export function useApiKey() {
@@ -10,7 +11,11 @@ export function useApiKey() {
 
   useEffect(() => {
     let cancelled = false;
-    loadApiKey().then((apiKey) => !cancelled && setState({ loaded: true, apiKey }));
+    const reload = () =>
+      loadApiKey()
+        .catch(() => "")
+        .then((apiKey) => !cancelled && setState({ loaded: true, apiKey }));
+    reload();
 
     if (typeof chrome === "undefined" || !chrome.storage?.onChanged) {
       return () => {
@@ -18,9 +23,7 @@ export function useApiKey() {
       };
     }
     const onChanged = (changes, area) => {
-      if (area !== "local" || !(API_KEY_KEY in changes)) return;
-      const value = changes[API_KEY_KEY].newValue;
-      setState({ loaded: true, apiKey: typeof value === "string" ? value.trim() : "" });
+      if (area === "local" && AI_FLAG_KEY in changes) reload();
     };
     chrome.storage.onChanged.addListener(onChanged);
     return () => {

@@ -46,8 +46,9 @@
   const STYLE_ID = "gemini-folder-addon-style";
   const STATE_KEY = "ga_folders_state_v3";
   const SETTINGS_KEY = "ga_settings_v1";
-  // Only checked for presence: AI features are shown only with a saved key.
-  const API_KEY_KEY = "ga_api_key_v1";
+  // Boolean flag "an API key is saved". The key itself is kept in the
+  // extension-only secret store and never reaches this script.
+  const AI_FLAG_KEY = "ga_ai_enabled_v1";
   const LEGACY_KEYS = ["ga_folders_state_v2", "ga_folders_html_v1"];
   const DRAG_MIME = "application/x-ga-chat";
   const HIDDEN_CLASS = "ga-hidden-original";
@@ -213,7 +214,7 @@
   let dropZone = null;
   let editing = null; // { type: "new" } | { type: "rename", id }
   let aiEnabled = false; // true only while an API key is saved
-  const hasKeyValue = (value) => typeof value === "string" && value.trim().length > 0;
+  const isAiFlagOn = (value) => value === true;
   let pendingFocus = null;
 
   const saveState = async () => {
@@ -1678,9 +1679,9 @@
   // Load + sync with storage / popup / background
   // ---------------------------------------------------------------------------
   const load = async () => {
-    const data = await storageGet([STATE_KEY, SETTINGS_KEY, API_KEY_KEY, ...LEGACY_KEYS]);
+    const data = await storageGet([STATE_KEY, SETTINGS_KEY, AI_FLAG_KEY, ...LEGACY_KEYS]);
     settings = normalizeSettings(data[SETTINGS_KEY]);
-    aiEnabled = hasKeyValue(data[API_KEY_KEY]);
+    aiEnabled = isAiFlagOn(data[AI_FLAG_KEY]);
 
     let needsSave = false;
     if (data[STATE_KEY]) {
@@ -1704,8 +1705,8 @@
     if (!selfAlive() || !chrome.storage?.onChanged) return;
     const listener = (changes, area) => {
       if (area !== "local") return;
-      if (API_KEY_KEY in changes) {
-        aiEnabled = hasKeyValue(changes[API_KEY_KEY].newValue);
+      if (AI_FLAG_KEY in changes) {
+        aiEnabled = isAiFlagOn(changes[AI_FLAG_KEY].newValue);
         refreshPickerOptions();
       }
       if (changes[SETTINGS_KEY]) {

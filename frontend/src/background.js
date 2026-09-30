@@ -7,6 +7,7 @@ import {
   loadApiKey,
   loadSettings,
   loadState,
+  migrateLegacyApiKey,
   removeChatEverywhere,
   saveState,
   sortedKeys,
@@ -27,7 +28,12 @@ const injectIntoOpenGeminiTabs = async () => {
 };
 
 chrome.runtime.onInstalled.addListener(() => {
+  migrateLegacyApiKey().catch(() => {});
   injectIntoOpenGeminiTabs();
+});
+
+chrome.runtime.onStartup.addListener(() => {
+  migrateLegacyApiKey().catch(() => {});
 });
 
 // All AI features need a user-provided key; without one they are hidden in
@@ -150,9 +156,21 @@ const handlers = {
   "ga:suggest-folder": (msg) => suggestFolder(msg.prompt),
 };
 
-chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+// Only our own popup/content scripts may use the AI features. (Web pages
+// and other extensions can't reach onMessage anyway – no
+// externally_connectable – this is defence in depth.) No handler ever
+// returns the API key.
+const isTrustedSender = (sender) =>
+  sender?.id === chrome.runtime.id &&
+  (!sender.tab || /^https:\/\/gemini\.google(usercontent)?\.com\//.test(sender.url || sender.tab.url || ""));
+
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   const handler = handlers[msg?.type];
   if (!handler) return undefined;
+  if (!isTrustedSender(sender)) {
+    sendResponse({ ok: false, error: "Nicht erlaubt." });
+    return undefined;
+  }
   handler(msg)
     .then(sendResponse)
     .catch((err) => sendResponse({ ok: false, error: err?.message || String(err) }));
