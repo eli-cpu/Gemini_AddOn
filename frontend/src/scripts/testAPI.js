@@ -1,71 +1,46 @@
-require("dotenv").config();
-const { GoogleGenerativeAI } = require("@google/generative-ai");
+// Quick check for the Gemini API key (runs in Node, not in the extension):
+//   node src/scripts/testAPI.js            -> test request
+//   node src/scripts/testAPI.js --models   -> list available models
+import { fileURLToPath } from "node:url";
+import dotenv from "dotenv";
 
-// --- KONFIGURATION ---
+dotenv.config({ path: fileURLToPath(new URL("../../../.env", import.meta.url)) });
+
 const GEMINI_KEY = process.env.GEMINI_API_KEY;
+const MODEL = process.env.GEMINI_MODEL || "gemini-flash-lite-latest";
+const API_BASE = "https://generativelanguage.googleapis.com/v1beta/models";
 
 if (!GEMINI_KEY) {
   console.error("Fehler: GEMINI_API_KEY fehlt in der .env Datei!");
   process.exit(1);
 }
 
-// Gemini Setup
-const genAI = new GoogleGenerativeAI(GEMINI_KEY);
-const model = genAI.getGenerativeModel({
-  model: "gemini-2.5-flash-lite",
-});
-
-// --- FUNKTIONEN ---
-
-/**
- * Testet den Gemini API-Key
- */
 async function testGeminiKey() {
-  console.log("\n[Gemini] Sende Test-Anfrage...");
-  const prompt = "Antworte kurz mit: 'Der API-Key funktioniert!'";
-
-  try {
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    console.log("--- Gemini Erfolg! ---");
-    console.log("Antwort:", response.text());
-  } catch (error) {
-    console.error("--- Fehler bei Gemini ---");
-    console.error("Nachricht:", error.message);
-  }
+  console.log(`[Gemini] Sende Test-Anfrage an ${MODEL} ...`);
+  const res = await fetch(`${API_BASE}/${MODEL}:generateContent`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "x-goog-api-key": GEMINI_KEY },
+    body: JSON.stringify({
+      contents: [{ parts: [{ text: "Antworte kurz mit: 'Der API-Key funktioniert!'" }] }],
+    }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data?.error?.message || res.statusText);
+  console.log("Antwort:", data.candidates?.[0]?.content?.parts?.[0]?.text);
 }
 
-/**
- * Listet verfügbare Gemini Modelle auf
- */
 async function listModels() {
-  console.log("\n[Gemini] Rufe Modell-Liste ab...");
-  try {
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models?key=${GEMINI_KEY}`,
-    );
-    const data = await response.json();
-
-    if (data.error) throw new Error(data.error.message);
-
-    console.log("Verfügbare Modelle:");
-    data.models
-      .filter((m) => m.supportedGenerationMethods.includes("generateContent"))
-      .forEach((m) => console.log(` - ${m.name.replace("models/", "")}`));
-  } catch (error) {
-    console.error("Fehler beim Abrufen der Modelle:", error.message);
-  }
+  const res = await fetch(`${API_BASE}?pageSize=200`, {
+    headers: { "x-goog-api-key": GEMINI_KEY },
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data?.error?.message || res.statusText);
+  data.models
+    .filter((m) => m.supportedGenerationMethods.includes("generateContent"))
+    .forEach((m) => console.log(` - ${m.name.replace("models/", "")}`));
 }
 
-// --- EXECUTION ---
-
-async function runTests() {
-  console.log("Starte API-Tests...");
-
-  await testGeminiKey();
-
-  // Falls du die Liste sehen willst, entkommentiere die nächste Zeile:
-  // await listModels();
-}
-
-runTests();
+(process.argv.includes("--models") ? listModels() : testGeminiKey()).catch((err) => {
+  console.error("Fehler bei Gemini:", err.message);
+  process.exit(1);
+});
