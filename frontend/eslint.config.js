@@ -26,4 +26,16 @@ export default defineConfig([
       'no-unused-vars': ['error', { varsIgnorePattern: '^[A-Z_]' }],
     },
   },
+  {
+    // Extension code: popup, background, content script
+    files: ['src/**/*.{js,jsx}', 'public/**/*.js'],
+    languageOptions: {
+      globals: { ...globals.browser, chrome: 'readonly' },
+    },
+  },
+  {
+    // Node-only helper scripts
+    files: ['src/scripts/testAPI.js', 'vite.config.js'],
+    languageOptions: { globals: globals.node },
+  },
 ])

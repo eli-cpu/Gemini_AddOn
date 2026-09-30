@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Gemini AddOn",
-  "description": "Löscht Ordner basierend auf maximaler Anzahl und Datum.",
+  "description": "Organisiert Gemini-Chats in Ordnern – per Drag & Drop oder automatisch per KI.",
   "version": "1.0.0",
   "action": {
     "default_title": "Gemini AddOn",
@@ -15,7 +15,8 @@
   "permissions": ["storage", "activeTab", "scripting", "tabs"],
   "host_permissions": [
     "https://gemini.google.com/*",
-    "https://gemini.googleusercontent.com/*"
+    "https://gemini.googleusercontent.com/*",
+    "https://generativelanguage.googleapis.com/*"
   ],
   "content_scripts": [
     {
@@ -33,6 +34,7 @@
     "128": "icon.png"
   },
   "background": {
-    "service_worker": "background.js"
+    "service_worker": "background.js",
+    "type": "module"
   }
 }

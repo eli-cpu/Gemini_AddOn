@@ -1,7 +1,9 @@
 {
-  "name": "frontend",
+  "name": "gemini-addon",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
+  "description": "Chrome extension: organize Google Gemini chats in folders",
+  "license": "MIT",
   "type": "module",
   "scripts": {
     "dev": "vite",
