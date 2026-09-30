@@ -87,6 +87,7 @@ Details: [PRIVACY.md](PRIVACY.md)
 cd frontend
 npm run lint     # ESLint
 npm run build    # Build nach frontend/dist
+npm run icons    # Icons aus frontend/icons/*.svg neu erzeugen (braucht rsvg-convert + ImageMagick)
 ```
 
 Aufbau, Konventionen und Stolperfallen stehen in [AGENT.md](AGENT.md); Beiträge siehe [CONTRIBUTING.md](CONTRIBUTING.md).

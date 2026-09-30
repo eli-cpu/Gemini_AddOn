@@ -7,12 +7,16 @@
     "default_title": "Gemini AddOn",
     "default_popup": "index.html",
     "default_icon": {
-      "16": "icon.png",
-      "48": "icon.png",
-      "128": "icon.png"
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png"
     }
   },
-  "permissions": ["storage", "activeTab", "scripting", "tabs"],
+  "permissions": [
+    "storage",
+    "activeTab",
+    "scripting",
+    "tabs"
+  ],
   "host_permissions": [
     "https://gemini.google.com/*",
     "https://gemini.googleusercontent.com/*",
@@ -24,14 +28,17 @@
         "https://gemini.google.com/*",
         "https://gemini.googleusercontent.com/*"
       ],
-      "js": ["autoFolderInit.js"],
+      "js": [
+        "autoFolderInit.js"
+      ],
       "run_at": "document_idle"
     }
   ],
   "icons": {
-    "16": "icon.png",
-    "48": "icon.png",
-    "128": "icon.png"
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
   },
   "background": {
     "service_worker": "background.js",

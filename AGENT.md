@@ -22,6 +22,7 @@ Run from `frontend/`:
 npm ci
 npm run lint     # must pass (0 errors)
 npm run build    # outputs dist/ – load this folder in chrome://extensions
+npm run icons    # re-render public/icons/*.png from icons/*.svg (rsvg-convert + ImageMagick)
 node src/scripts/testAPI.js   # dev-only: checks GEMINI_API_KEY from ../.env (the extension doesn't use it)
 ```
 

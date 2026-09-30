@@ -1,0 +1,19 @@
+rsvg-convert: /bin/rsvg-convert
+inkscape: no
+magick: /bin/magick
+convert: /bin/convert
+resvg: /bin/resvg
+PIL 12.3.0
+ModuleNotFoundError: No module named 'cairosvg'
+autoFolderInit.js
+icon.png
+icons.svg
+manifest.json
+frontend/index.html:5:    <link rel="icon" type="image/png" href="/icon.png" />
+frontend/src/App.jsx:92:            <img className="app-logo" src="/icon.png" alt="" />
+frontend/public/manifest.json:10:      "16": "icon.png",
+frontend/public/manifest.json:11:      "48": "icon.png",
+frontend/public/manifest.json:12:      "128": "icon.png"
+frontend/public/manifest.json:32:    "16": "icon.png",
+frontend/public/manifest.json:33:    "48": "icon.png",
+frontend/public/manifest.json:34:    "128": "icon.png"

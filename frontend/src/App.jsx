@@ -89,7 +89,7 @@ function App() {
       {currentPage === "home" && (
         <>
           <header className="app-header">
-            <img className="app-logo" src="/icon.png" alt="" />
+            <img className="app-logo" src="/icons/icon48.png" alt="" />
             <div>
               <h1>Gemini AddOn</h1>
               <span className="chip" data-state={connection.state}>
