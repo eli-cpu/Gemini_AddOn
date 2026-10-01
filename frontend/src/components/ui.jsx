@@ -72,6 +72,37 @@ export function PageHeader({ title, subtitle, onBack }) {
   );
 }
 
+const SITE_OPTIONS = [
+  { id: "gemini", label: "Gemini" },
+  { id: "chatgpt", label: "ChatGPT" },
+];
+
+// Segmented control: which site's folders are shown/edited. Implemented as
+// a radio group so arrow keys work and screen readers announce the choice.
+export function SiteSwitch({ value, onChange, activeSite }) {
+  return (
+    <div className="segmented" role="radiogroup" aria-label="Ordner von">
+      {SITE_OPTIONS.map((option) => (
+        <label key={option.id} className="segment">
+          <input
+            type="radio"
+            name="site"
+            value={option.id}
+            checked={value === option.id}
+            onChange={() => onChange(option.id)}
+          />
+          <span>
+            {option.label}
+            {activeSite === option.id && (
+              <span className="segment-dot" title="Aktiver Tab" aria-label="(aktiver Tab)" />
+            )}
+          </span>
+        </label>
+      ))}
+    </div>
+  );
+}
+
 export function Status({ children, tone = "neutral" }) {
   if (!children) return null;
   return (

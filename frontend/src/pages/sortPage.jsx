@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { getActiveGeminiTab } from "../lib/tabs";
+import { getActiveChatTab } from "../lib/tabs";
+import { siteLabel } from "../lib/sites";
 import { Icon, PageHeader, Status } from "../components/ui";
 
 // KI-Sortierung: the actual work happens in the background service worker
@@ -12,9 +13,10 @@ function SortPage({ onBack }) {
 
   const handleSort = async () => {
     setBusy(true);
-    setStatus({ text: "Gemini sortiert deine Chats …", tone: "neutral" });
+    setStatus({ text: "Sortiere …", tone: "neutral" });
     try {
-      const tab = await getActiveGeminiTab();
+      const { tab, site } = await getActiveChatTab();
+      setStatus({ text: `Sortiere deine ${siteLabel(site)}-Chats …`, tone: "neutral" });
       const result = await chrome.runtime.sendMessage({
         type: "ga:ai-sort",
         tabId: tab.id,
@@ -33,7 +35,7 @@ function SortPage({ onBack }) {
     <>
       <PageHeader
         title="KI-Sortierung"
-        subtitle="Geladene Chats thematisch einsortieren"
+        subtitle="Chats im aktiven Gemini- oder ChatGPT-Tab einsortieren"
         onBack={onBack}
       />
 
@@ -65,8 +67,8 @@ function SortPage({ onBack }) {
       <p className="tip">
         <Icon name="sparkle" size={16} />
         <span>
-          Es werden nur Chats berücksichtigt, die Gemini in der Seitenleiste
-          geladen hat. Die Titel werden an die Gemini-API gesendet.
+          Sortiert die Chats, die im aktiven Tab (Gemini oder ChatGPT) in der
+          Seitenleiste geladen sind. Die Titel werden an die Gemini-API gesendet.
         </span>
       </p>
 

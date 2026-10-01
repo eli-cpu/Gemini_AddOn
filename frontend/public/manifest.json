@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Gemini AddOn",
-  "description": "Organisiert Gemini-Chats in Ordnern – per Drag & Drop oder automatisch per KI.",
+  "description": "Organisiert Gemini- und ChatGPT-Chats in Ordnern – per Drag & Drop, manuell oder per KI.",
   "version": "1.0.0",
   "action": {
     "default_title": "Gemini AddOn",
@@ -20,13 +20,15 @@
   "host_permissions": [
     "https://gemini.google.com/*",
     "https://gemini.googleusercontent.com/*",
+    "https://chatgpt.com/*",
     "https://generativelanguage.googleapis.com/*"
   ],
   "content_scripts": [
     {
       "matches": [
         "https://gemini.google.com/*",
-        "https://gemini.googleusercontent.com/*"
+        "https://gemini.googleusercontent.com/*",
+        "https://chatgpt.com/*"
       ],
       "js": [
         "autoFolderInit.js"

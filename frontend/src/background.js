@@ -1,6 +1,7 @@
 // Service worker: runs the AI sorting (so it survives the popup closing)
-// and injects the content script into Gemini tabs that were already open
-// when the extension was installed/reloaded.
+// and injects the content script into Gemini/ChatGPT tabs that were already
+// open when the extension was installed/reloaded. The AI itself always uses
+// the Gemini API with the user's key, on both sites.
 import { requestFolderForPrompt, requestFolderSuggestions } from "./lib/gemini";
 import {
   createFolderIn,
@@ -12,12 +13,11 @@ import {
   saveState,
   sortedKeys,
 } from "./lib/storage";
-import { CONTENT_SCRIPT_FILE, isGeminiUrl, sendToTab } from "./lib/tabs";
+import { CONTENT_SCRIPT_FILE, sendToTab } from "./lib/tabs";
+import { SITE_URL_PATTERNS, siteForUrl, siteLabel } from "./lib/sites";
 
-const injectIntoOpenGeminiTabs = async () => {
-  const tabs = await chrome.tabs.query({
-    url: ["https://gemini.google.com/*", "https://gemini.googleusercontent.com/*"],
-  });
+const injectIntoOpenChatTabs = async () => {
+  const tabs = await chrome.tabs.query({ url: SITE_URL_PATTERNS });
   await Promise.all(
     tabs.map((tab) =>
       chrome.scripting
@@ -29,7 +29,7 @@ const injectIntoOpenGeminiTabs = async () => {
 
 chrome.runtime.onInstalled.addListener(() => {
   migrateLegacyApiKey().catch(() => {});
-  injectIntoOpenGeminiTabs();
+  injectIntoOpenChatTabs();
 });
 
 chrome.runtime.onStartup.addListener(() => {
@@ -47,20 +47,21 @@ const requireApiKey = async () => {
 };
 
 /**
- * Collects chats from the Gemini sidebar, asks Gemini for a grouping and
- * writes the result into the folder state.
+ * Collects chats from the sidebar of the tab's site, asks Gemini for a
+ * grouping and writes the result into that site's folder state.
  */
 export async function aiSort(tabId, { onlyUnsorted = true, maxChats = 100 } = {}) {
   const apiKey = await requireApiKey();
   const tab = await chrome.tabs.get(tabId);
-  if (!isGeminiUrl(tab?.url)) {
-    throw new Error("Bitte zuerst gemini.google.com im aktiven Tab öffnen.");
+  const site = siteForUrl(tab?.url);
+  if (!site) {
+    throw new Error("Bitte zuerst Gemini oder ChatGPT im aktiven Tab öffnen.");
   }
 
   const response = await sendToTab(tabId, { type: "ga:get-chats" });
   const sidebarChats = Array.isArray(response?.chats) ? response.chats : [];
 
-  const [state, settings] = await Promise.all([loadState(), loadSettings()]);
+  const [state, settings] = await Promise.all([loadState(site), loadSettings()]);
   const alreadySorted = sortedKeys(state);
 
   // Loose chats in the Folders area are also "unsorted" candidates.
@@ -74,7 +75,7 @@ export async function aiSort(tabId, { onlyUnsorted = true, maxChats = 100 } = {}
   if (!chats.length) {
     const message = sidebarChats.length
       ? "Alle geladenen Chats sind bereits in Ordnern."
-      : "Keine Chats in der Gemini-Seitenleiste erkannt. Seitenleiste öffnen und Seite neu laden (F5).";
+      : `Keine Chats in der ${siteLabel(site)}-Seitenleiste erkannt. Seitenleiste öffnen und Seite neu laden (F5).`;
     return { ok: !!sidebarChats.length, moved: 0, created: 0, message, error: message };
   }
 
@@ -91,7 +92,7 @@ export async function aiSort(tabId, { onlyUnsorted = true, maxChats = 100 } = {}
   );
 
   // Re-read in case the user changed something while the request was running.
-  const fresh = await loadState();
+  const fresh = await loadState(site);
   let moved = 0;
   let created = 0;
   let skipped = 0;
@@ -127,8 +128,9 @@ export async function aiSort(tabId, { onlyUnsorted = true, maxChats = 100 } = {}
     (f) => f.chats.length || state.folders.some((old) => old.id === f.id),
   );
 
-  await saveState(fresh);
+  await saveState(fresh, site);
   return {
+    site,
     ok: true,
     moved,
     created,
@@ -140,20 +142,25 @@ export async function aiSort(tabId, { onlyUnsorted = true, maxChats = 100 } = {}
 }
 
 /** Suggests a folder for the first prompt of a new chat (content script). */
-export async function suggestFolder(prompt) {
+export async function suggestFolder(prompt, site) {
   const text = String(prompt || "").trim();
   if (!text) throw new Error("Keine Nachricht zum Auswerten.");
+  if (!site) throw new Error("Unbekannte Seite.");
   const apiKey = await requireApiKey();
-  const [state, settings] = await Promise.all([loadState(), loadSettings()]);
+  const [state, settings] = await Promise.all([loadState(site), loadSettings()]);
   const names = state.folders.map((f) => f.name);
   const allowNew = state.folders.length < settings.maxFolders;
   const result = await requestFolderForPrompt(text, names, allowNew, { apiKey });
   return { ok: true, ...result };
 }
 
+// The site of a content-script message comes from the sender's URL, never
+// from the message itself.
+const senderSite = (sender) => siteForUrl(sender?.url || sender?.tab?.url || "");
+
 const handlers = {
   "ga:ai-sort": (msg) => aiSort(msg.tabId, msg.options),
-  "ga:suggest-folder": (msg) => suggestFolder(msg.prompt),
+  "ga:suggest-folder": (msg, sender) => suggestFolder(msg.prompt, senderSite(sender)),
 };
 
 // Only our own popup/content scripts may use the AI features. (Web pages
@@ -161,8 +168,7 @@ const handlers = {
 // externally_connectable – this is defence in depth.) No handler ever
 // returns the API key.
 const isTrustedSender = (sender) =>
-  sender?.id === chrome.runtime.id &&
-  (!sender.tab || /^https:\/\/gemini\.google(usercontent)?\.com\//.test(sender.url || sender.tab.url || ""));
+  sender?.id === chrome.runtime.id && (!sender.tab || !!senderSite(sender));
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   const handler = handlers[msg?.type];
@@ -171,7 +177,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     sendResponse({ ok: false, error: "Nicht erlaubt." });
     return undefined;
   }
-  handler(msg)
+  handler(msg, sender)
     .then(sendResponse)
     .catch((err) => sendResponse({ ok: false, error: err?.message || String(err) }));
   return true; // async response

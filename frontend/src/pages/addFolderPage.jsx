@@ -1,17 +1,19 @@
 import { useEffect, useState } from "react";
 import {
-  STATE_KEY,
   loadState,
   normalizeState,
   removeChatEverywhere,
+  stateKeyFor,
   updateState,
 } from "../lib/storage";
-import { Icon, IconButton, PageHeader, Status } from "../components/ui";
+import { siteLabel } from "../lib/sites";
+import { Icon, IconButton, PageHeader, SiteSwitch, Status } from "../components/ui";
 import { useConfirm } from "../components/useConfirm";
 
 // Ordner-Verwaltung: rename/delete folders and remove chats from them.
-// Changes go to chrome.storage; the Gemini tab re-renders automatically.
-function AddFolderPage({ onBack }) {
+// Shows the folders of one site (remounted via `key` when the site changes).
+// Changes go to chrome.storage; open tabs of that site re-render automatically.
+function AddFolderPage({ site, onSiteChange, activeSite, onBack }) {
   const hasStorage = typeof chrome !== "undefined" && !!chrome.storage?.onChanged;
   const [state, setState] = useState(null);
   const [status, setStatus] = useState({
@@ -25,19 +27,20 @@ function AddFolderPage({ onBack }) {
 
   useEffect(() => {
     if (!hasStorage) return undefined;
-    loadState().then(setState);
+    const key = stateKeyFor(site);
+    loadState(site).then(setState);
     const onChanged = (changes, area) => {
-      if (area === "local" && changes[STATE_KEY]) {
-        setState(normalizeState(changes[STATE_KEY].newValue));
+      if (area === "local" && changes[key]) {
+        setState(normalizeState(changes[key].newValue));
       }
     };
     chrome.storage.onChanged.addListener(onChanged);
     return () => chrome.storage.onChanged.removeListener(onChanged);
-  }, [hasStorage]);
+  }, [hasStorage, site]);
 
   const run = async (mutator, text) => {
     try {
-      await updateState(mutator);
+      await updateState(mutator, site);
       if (text) setStatus({ text, tone: "success" });
     } catch (err) {
       setStatus({ text: err?.message || String(err), tone: "error" });
@@ -110,16 +113,18 @@ function AddFolderPage({ onBack }) {
         title="Ordner verwalten"
         subtitle={
           state
-            ? `${folders.length} Ordner${looseCount ? ` · ${looseCount} Chats ohne Ordner` : ""}`
+            ? `${siteLabel(site)} · ${folders.length} Ordner${looseCount ? ` · ${looseCount} Chats ohne Ordner` : ""}`
             : undefined
         }
         onBack={onBack}
       />
 
+      <SiteSwitch value={site} onChange={onSiteChange} activeSite={activeSite} />
+
       {state && folders.length === 0 && (
         <div className="empty">
           <Icon name="folder" size={32} />
-          <span>Noch keine Ordner vorhanden.</span>
+          <span>Noch keine Ordner für {siteLabel(site)} vorhanden.</span>
         </div>
       )}
 

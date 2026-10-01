@@ -13,8 +13,8 @@
 
 ## 2. Repository-Einstellungen (github.com → Settings)
 
-- [ ] **General**: Beschreibung, z. B. „Chrome extension: organize Google Gemini chats in folders – drag & drop, manual or AI-powered“
-- [ ] **Topics**: `chrome-extension`, `gemini`, `google-gemini`, `manifest-v3`, `react`, `vite`, `productivity`
+- [ ] **General**: Beschreibung, z. B. „Chrome extension: organize Gemini and ChatGPT chats in folders – drag & drop, manual or AI-powered“
+- [ ] **Topics**: `chrome-extension`, `gemini`, `chatgpt`, `manifest-v3`, `react`, `vite`, `productivity`
 - [ ] **Visibility** → Public
 - [ ] **Security** → Private vulnerability reporting aktivieren (für `SECURITY.md`)
 - [ ] **Security** → Secret scanning + Push protection aktivieren (blockt versehentliche Key-Pushes)
@@ -40,4 +40,5 @@ cd dist && zip -r ../../gemini-addon-v1.0.0.zip . && cd -
 
 - Entwicklerkonto (einmalige Gebühr), [Developer Dashboard](https://chrome.google.com/webstore/devconsole)
 - Voraussetzungen: Datenschutzerklärung als öffentliche URL (z. B. `PRIVACY.md` auf GitHub), Begründung für jede Berechtigung (Tabelle in `PRIVACY.md`), Store-Screenshots 1280×800
-- Namen/Icon so wählen, dass keine Verwechslung mit einem offiziellen Google-Produkt entsteht
+- Namen/Icon so wählen, dass keine Verwechslung mit einem offiziellen Google- oder OpenAI-Produkt entsteht (der aktuelle Name „Gemini AddOn“ ist dafür ungeeignet, da jetzt auch ChatGPT unterstützt wird – z. B. „Chat Folders“)
+- Zwei Berechtigungen für Host-Zugriff (gemini.google.com, chatgpt.com) im Review begründen

@@ -4,23 +4,37 @@ import SortPage from "./pages/sortPage";
 import AddFolderPage from "./pages/addFolderPage";
 import SettingsPage from "./pages/settingsPage";
 import ApiKeyPage from "./pages/apiKeyPage";
-import { Icon, Status } from "./components/ui";
-import { getActiveGeminiTab, hasExtensionApis, sendToTab } from "./lib/tabs";
-import { createFolderIn, loadSettings, maskApiKey, updateState } from "./lib/storage";
+import { Icon, SiteSwitch, Status } from "./components/ui";
+import { getActiveChatTab, hasExtensionApis, sendToTab } from "./lib/tabs";
+import {
+  createFolderIn,
+  loadPopupSite,
+  loadSettings,
+  maskApiKey,
+  savePopupSite,
+  updateState,
+} from "./lib/storage";
+import { siteLabel } from "./lib/sites";
 import { useApiKey } from "./lib/useApiKey";
 
-// Drag & drop is always on: the content script runs on every Gemini page.
-// Opening the popup additionally makes sure it is injected into the active
-// tab (e.g. tabs that were open before the extension was installed).
+// Drag & drop is always on: the content script runs on every Gemini/ChatGPT
+// page. Opening the popup additionally makes sure it is injected into the
+// active tab (e.g. tabs that were open before the extension was installed).
 async function connectActiveTab() {
-  if (!hasExtensionApis()) return { state: "error", text: "Nur in der Extension verfügbar" };
+  if (!hasExtensionApis()) return { state: "error", text: "Nur in der Extension verfügbar", site: null };
+  let active;
   try {
-    const tab = await getActiveGeminiTab();
-    const res = await sendToTab(tab.id, { type: "ga:refresh" });
-    if (!res?.mounted) return { state: "idle", text: "Seitenleiste in Gemini öffnen" };
-    return { state: "active", text: `Aktiv · ${res.nativeCount} Chats erkannt` };
+    active = await getActiveChatTab();
   } catch {
-    return { state: "idle", text: "Öffne gemini.google.com" };
+    return { state: "idle", text: "Öffne Gemini oder ChatGPT", site: null };
+  }
+  const label = siteLabel(active.site);
+  try {
+    const res = await sendToTab(active.tab.id, { type: "ga:refresh" });
+    if (!res?.mounted) return { state: "idle", text: `Seitenleiste in ${label} öffnen`, site: active.site };
+    return { state: "active", text: `${label} · ${res.nativeCount} Chats erkannt`, site: active.site };
+  } catch {
+    return { state: "idle", text: `${label}-Tab neu laden (F5)`, site: active.site };
   }
 }
 
@@ -46,31 +60,50 @@ const buildMenu = (apiKey) => [
 function App() {
   const [page, setPage] = useState("home");
   const { loaded: keyLoaded, apiKey, hasKey } = useApiKey();
-  const [connection, setConnection] = useState({ state: "idle", text: "Verbinde …" });
+  const [connection, setConnection] = useState({ state: "idle", text: "Verbinde …", site: null });
+  // Which site's folders the popup shows/edits: the active tab's site, or
+  // the last one chosen.
+  const [site, setSite] = useState(null);
   const [folderName, setFolderName] = useState("");
   const [status, setStatus] = useState({ text: "", tone: "neutral" });
 
   useEffect(() => {
     let cancelled = false;
-    connectActiveTab().then((c) => !cancelled && setConnection(c));
+    connectActiveTab().then(async (c) => {
+      if (cancelled) return;
+      setConnection(c);
+      const initial = c.site || (await loadPopupSite());
+      if (!cancelled) setSite((current) => current || initial);
+    });
     return () => {
       cancelled = true;
     };
   }, []);
 
+  const chooseSite = (next) => {
+    setSite(next);
+    setStatus({ text: "", tone: "neutral" });
+    savePopupSite(next).catch(() => {});
+  };
+
   const handleCreateFolder = async (e) => {
     e.preventDefault();
+    if (!site) return;
     try {
       const settings = await loadSettings();
-      const result = await updateState((state) =>
-        createFolderIn(state, folderName, settings.maxFolders),
+      const result = await updateState(
+        (state) => createFolderIn(state, folderName, settings.maxFolders),
+        site,
       );
       if (!result.ok) {
         setStatus({ text: `Maximal ${settings.maxFolders} Ordner erlaubt.`, tone: "error" });
         return;
       }
       setFolderName("");
-      setStatus({ text: `Ordner „${result.folder.name}“ erstellt.`, tone: "success" });
+      setStatus({
+        text: `Ordner „${result.folder.name}“ in ${siteLabel(site)} erstellt.`,
+        tone: "success",
+      });
     } catch (err) {
       setStatus({ text: err?.message || String(err), tone: "error" });
     }
@@ -98,6 +131,8 @@ function App() {
             </div>
           </header>
 
+          {site && <SiteSwitch value={site} onChange={chooseSite} activeSite={connection.site} />}
+
           <form className="create-row" onSubmit={handleCreateFolder}>
             <label className="visually-hidden" htmlFor="folder-name">
               Ordnername
@@ -105,12 +140,12 @@ function App() {
             <input
               id="folder-name"
               className="input"
-              placeholder="Neuer Ordner"
+              placeholder={site ? `Neuer Ordner in ${siteLabel(site)}` : "Neuer Ordner"}
               value={folderName}
               onChange={(e) => setFolderName(e.target.value)}
               maxLength={80}
             />
-            <button className="btn btn-primary" type="submit">
+            <button className="btn btn-primary" type="submit" disabled={!site}>
               <Icon name="add" size={18} />
               Erstellen
             </button>
@@ -139,15 +174,17 @@ function App() {
           <p className="tip">
             <Icon name="drag" size={16} />
             <span>
-              Chats in der Gemini-Seitenleiste einfach auf „Folders“ oder einen
-              Ordner ziehen.
+              Chats in der Seitenleiste von Gemini oder ChatGPT einfach auf
+              „Folders“ oder einen Ordner ziehen.
             </span>
           </p>
         </>
       )}
 
       {currentPage === "sort" && <SortPage onBack={back} />}
-      {currentPage === "addFolder" && <AddFolderPage onBack={back} />}
+      {currentPage === "addFolder" && site && (
+        <AddFolderPage key={site} site={site} onSiteChange={chooseSite} activeSite={connection.site} onBack={back} />
+      )}
       {currentPage === "settings" && <SettingsPage onBack={back} />}
       {currentPage === "apiKey" && <ApiKeyPage apiKey={apiKey} onBack={back} />}
     </main>

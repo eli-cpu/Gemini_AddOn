@@ -1,26 +1,25 @@
-// Helpers for talking to the content script in a Gemini tab.
+// Helpers for talking to the content script in a Gemini/ChatGPT tab.
+import { siteForUrl } from "./sites";
 
 export const CONTENT_SCRIPT_FILE = "autoFolderInit.js";
-
-export const isGeminiUrl = (url = "") =>
-  url.startsWith("https://gemini.google.com/") ||
-  url.startsWith("https://gemini.googleusercontent.com/");
 
 export const hasExtensionApis = () =>
   typeof chrome !== "undefined" &&
   !!chrome.tabs?.query &&
   !!chrome.scripting?.executeScript;
 
-export async function getActiveGeminiTab() {
+const NOT_SUPPORTED = "Bitte zuerst Gemini oder ChatGPT im aktiven Tab öffnen.";
+
+/** Active tab plus its site id. Throws if it's not a supported chat site. */
+export async function getActiveChatTab() {
   if (!hasExtensionApis()) {
     throw new Error("Chrome Extension APIs nicht verfügbar.");
   }
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   if (!tab?.id) throw new Error("Kein aktiver Tab gefunden.");
-  if (!isGeminiUrl(tab.url)) {
-    throw new Error("Bitte zuerst gemini.google.com im aktiven Tab öffnen.");
-  }
-  return tab;
+  const site = siteForUrl(tab.url);
+  if (!site) throw new Error(NOT_SUPPORTED);
+  return { tab, site };
 }
 
 /**

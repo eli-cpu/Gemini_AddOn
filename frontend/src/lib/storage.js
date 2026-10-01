@@ -3,9 +3,13 @@
 // (the content script cannot import modules).
 
 import { deleteSecret, getSecret, hasSecretStore, setSecret } from "./secretStore";
+import { DEFAULT_SITE, SITES, normalizeSite } from "./sites";
 
-export const STATE_KEY = "ga_folders_state_v3";
+// Folders are stored per site (Gemini and ChatGPT chat ids are unrelated).
+export const stateKeyFor = (site = DEFAULT_SITE) => SITES[normalizeSite(site)].stateKey;
 export const SETTINGS_KEY = "ga_settings_v1";
+// Last site chosen in the popup (UI preference only).
+export const POPUP_SITE_KEY = "ga_popup_site_v1";
 // Boolean flag in chrome.storage.local: "an API key is saved". This is all
 // the content script ever sees – the key itself lives in the extension-only
 // secret store (lib/secretStore.js).
@@ -80,19 +84,31 @@ export const normalizeSettings = (raw) => {
 const hasChrome = () =>
   typeof chrome !== "undefined" && !!chrome.storage?.local;
 
-export async function loadState() {
+export async function loadState(site = DEFAULT_SITE) {
   if (!hasChrome()) return emptyState();
-  const result = await chrome.storage.local.get(STATE_KEY);
-  return normalizeState(result[STATE_KEY]);
+  const key = stateKeyFor(site);
+  const result = await chrome.storage.local.get(key);
+  return normalizeState(result[key]);
 }
 
-export async function saveState(state) {
+export async function saveState(state, site = DEFAULT_SITE) {
   const payload = {
     ...normalizeState(state),
     updatedAt: new Date().toISOString(),
   };
-  await chrome.storage.local.set({ [STATE_KEY]: payload });
+  await chrome.storage.local.set({ [stateKeyFor(site)]: payload });
   return payload;
+}
+
+export async function loadPopupSite() {
+  if (!hasChrome()) return DEFAULT_SITE;
+  const result = await chrome.storage.local.get(POPUP_SITE_KEY);
+  return normalizeSite(result[POPUP_SITE_KEY]);
+}
+
+export async function savePopupSite(site) {
+  if (!hasChrome()) return;
+  await chrome.storage.local.set({ [POPUP_SITE_KEY]: normalizeSite(site) });
 }
 
 export async function loadSettings() {
@@ -147,10 +163,10 @@ export const maskApiKey = (key) =>
   key ? `${key.slice(0, 4)}…${key.slice(-4)}` : "";
 
 /** Reads, mutates and writes the state in one go. */
-export async function updateState(mutator) {
-  const state = await loadState();
+export async function updateState(mutator, site = DEFAULT_SITE) {
+  const state = await loadState(site);
   const result = await mutator(state);
-  await saveState(state);
+  await saveState(state, site);
   return result;
 }
 

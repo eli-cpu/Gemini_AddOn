@@ -44,39 +44,115 @@
   const PICKER_ID = "ga-new-chat-folder-picker";
   const TOAST_ID = "ga-toast";
   const STYLE_ID = "gemini-folder-addon-style";
-  const STATE_KEY = "ga_folders_state_v3";
   const SETTINGS_KEY = "ga_settings_v1";
   // Boolean flag "an API key is saved". The key itself is kept in the
   // extension-only secret store and never reaches this script.
   const AI_FLAG_KEY = "ga_ai_enabled_v1";
-  const LEGACY_KEYS = ["ga_folders_state_v2", "ga_folders_html_v1"];
   const DRAG_MIME = "application/x-ga-chat";
-  const HIDDEN_CLASS = "ga-hidden-original";
+  // Hidden sidebar rows get an attribute instead of a class: React/Angular
+  // rewrite `className` on re-render, but leave unknown attributes alone.
+  const HIDDEN_ATTR = "data-ga-hidden";
   const DEFAULT_SETTINGS = { maxFolders: 10, autoDeleteDays: 0 };
 
-  // Gemini DOM (changes regularly – keep all selectors here).
-  const NATIVE_ITEM_SELECTOR =
-    ".conversation-items-container, .conversations-items-container";
-  const CHAT_LINK_SELECTOR = 'a[href*="/app/"]';
-  const CHAT_ID_RE = /\/app\/([\w-]{6,})/;
-  const SIDEBAR_ROOT_SELECTOR =
-    "bard-sidenav, mat-sidenav, .sidenav-with-history-container, side-navigation-v2";
-  const RECENT_HEADING_RE = /^(letzte unterhaltungen|recent|recent chats|chats)$/i;
-  // Elements in the input toolbar; the folder chip is inserted before the
-  // first one found (model switcher "Flash/Pro", then the mic button).
-  const TOOLBAR_ANCHOR_SELECTORS = [
-    "bard-mode-switcher",
-    "[data-test-id='bard-mode-menu-button']",
-    "speech-dictation-mic-button",
-    "button[aria-label*='Mikrofon' i]",
-    "button[aria-label*='microphone' i]",
-    "button[aria-label*='Spracheingabe' i]",
-  ];
-  const EDITOR_SELECTOR =
-    'rich-textarea [contenteditable="true"], .ql-editor[contenteditable="true"]';
-  const SEND_BUTTON_SELECTOR =
-    'button.send-button, button[aria-label*="Send" i], button[aria-label*="Senden" i], [data-test-id="send-button"]';
-  const NEW_CHAT_PATH_RE = /^(\/u\/\d+)?\/app\/?$/;
+  // ---------------------------------------------------------------------------
+  // Per-site DOM configuration. Both UIs change regularly – keep every
+  // site-specific selector in here and add fallbacks instead of replacing.
+  // Keep keys/ids in sync with src/lib/sites.js.
+  // ---------------------------------------------------------------------------
+  const SITES = {
+    gemini: {
+      id: "gemini",
+      label: "Gemini",
+      hosts: ["gemini.google.com", "gemini.googleusercontent.com"],
+      stateKey: "ga_folders_state_v3",
+      legacyKeys: ["ga_folders_state_v2", "ga_folders_html_v1"],
+      // Chat links: /app/<id>, also /u/<n>/app/<id> for secondary accounts.
+      linkSelector: 'a[href*="/app/"]',
+      chatPathRe: /^(?:\/u\/\d+)?\/app\/([\w-]{6,})/,
+      chatHref: (id) => `/app/${id}`,
+      itemSelector:
+        '.conversation-items-container, .conversations-items-container, [data-test-id="conversation"]',
+      // Wrappers from older Gemini versions that have no /app/ link.
+      legacyItemSelector: ".conversation-items-container, .conversations-items-container",
+      titleSelector: ".conversation-title, [class*='title']",
+      sidebarSelectors: [
+        "bard-sidenav",
+        "mat-sidenav",
+        ".sidenav-with-history-container",
+        "side-navigation-v2",
+      ],
+      sidebarMarker: "conversations-list, .gems-list-container",
+      mountPoints: [
+        { selector: ".gems-list-container", where: "after" },
+        { selector: "conversations-list", where: "before" },
+      ],
+      listSelector:
+        "conversations-list, infinite-scroller, [class*='conversations-container'], [class*='chat-history'], ul, ol",
+      mainSelector: 'main, chat-window, [role="main"], search-page, .search-page',
+      newChatPathRe: /^(\/u\/\d+)?\/app\/?$/,
+      editorSelector: 'rich-textarea [contenteditable="true"], .ql-editor[contenteditable="true"]',
+      composerSelector: "input-area-v2, input-container, .input-area, form",
+      // Folder chip goes before the first one found (Flash/Pro, then mic).
+      toolbarAnchors: [
+        "bard-mode-switcher",
+        "[data-test-id='bard-mode-menu-button']",
+        "speech-dictation-mic-button",
+        "button[aria-label*='Mikrofon' i]",
+        "button[aria-label*='microphone' i]",
+        "button[aria-label*='Spracheingabe' i]",
+      ],
+      sendSelector:
+        'button.send-button, button[aria-label*="Send" i], button[aria-label*="Senden" i], [data-test-id="send-button"]',
+    },
+    chatgpt: {
+      id: "chatgpt",
+      label: "ChatGPT",
+      hosts: ["chatgpt.com"],
+      stateKey: "ga_folders_state_v3_chatgpt",
+      legacyKeys: [],
+      // Chat links: /c/<id>, also inside GPTs/projects: /g/<gpt>/c/<id>.
+      linkSelector: 'a[href*="/c/"]',
+      chatPathRe: /^(?:\/g\/[\w-]+)?\/c\/([\w-]{8,})/,
+      chatHref: (id) => `/c/${id}`,
+      itemSelector: 'li[data-testid^="history-item"], a[data-sidebar-item]',
+      legacyItemSelector: null,
+      titleSelector: ".truncate, [dir='auto']",
+      sidebarSelectors: [
+        "#stage-slideover-sidebar",
+        "nav:has(#history)",
+        "nav[aria-label]",
+      ],
+      sidebarMarker: "#history",
+      mountPoints: [{ selector: "#history", where: "before" }],
+      listSelector: "#history, aside, ul, ol",
+      mainSelector: 'main, [role="main"], #thread, [role="dialog"]',
+      // New chat: "/", a GPT start page "/g/<gpt>" or a project "/g/<p>/project".
+      newChatPathRe: /^\/(?:g\/[\w-]+(?:\/project)?\/?)?$/,
+      editorSelector:
+        '#prompt-textarea, [data-testid="prompt-textarea"], form [contenteditable="true"][role="textbox"], form textarea[name="prompt-textarea"]',
+      composerSelector: "form",
+      toolbarAnchors: [
+        "[data-testid='composer-speech-button']",
+        "button[aria-label*='Dictate' i]",
+        "button[aria-label*='Diktier' i]",
+        "#composer-submit-button",
+        "[data-testid='send-button']",
+        "form button[type='submit']",
+      ],
+      sendSelector:
+        '#composer-submit-button, [data-testid="send-button"], form button[type="submit"]',
+    },
+  };
+
+  const SITE =
+    Object.values(SITES).find((s) => s.hosts.includes(window.location.hostname)) || null;
+  if (!SITE) return; // not a supported chat site
+
+  const STATE_KEY = SITE.stateKey;
+  const LEGACY_KEYS = SITE.legacyKeys;
+  const SIDEBAR_ROOT_SELECTOR = SITE.sidebarSelectors.join(", ");
+  const RECENT_HEADING_RE =
+    /^(letzte unterhaltungen|recent|recent chats|chats|verlauf|chatverlauf|your chats|deine chats)$/i;
 
   // Folder picker option values
   const AUTO = "__auto__";
@@ -164,7 +240,9 @@
     return {
       key: String(chat.key),
       title: String(chat.title || "Unbenannter Chat"),
-      href: chat.href ? String(chat.href) : "",
+      // Only same-origin chat paths – drag data and storage are untrusted
+      // input, and the href ends up in <a href> / location.assign().
+      href: safeChatHref(chat.href),
     };
   };
 
@@ -234,12 +312,46 @@
   // ---------------------------------------------------------------------------
   const inZone = (node) => !!dropZone && !!node && dropZone.contains(node);
 
-  const isChatLink = (a) => CHAT_ID_RE.test(a?.getAttribute?.("href") || "");
+  // Selector helpers that never throw (e.g. `:has()` in older engines).
+  const safeAll = (root, selector) => {
+    try {
+      return Array.from(root.querySelectorAll(selector));
+    } catch {
+      return [];
+    }
+  };
+  const safeMatches = (node, selector) => {
+    try {
+      return node.matches(selector);
+    } catch {
+      return false;
+    }
+  };
+
+  // Chat id from a link/URL – only same-origin chat paths count, so links to
+  // other sites inside chat answers (e.g. https://example.com/c/…) are ignored.
+  const chatIdFromHref = (href) => {
+    if (!href) return "";
+    try {
+      const url = new URL(href, window.location.href);
+      if (url.origin !== window.location.origin) return "";
+      return url.pathname.match(SITE.chatPathRe)?.[1] || "";
+    } catch {
+      return "";
+    }
+  };
+
+  // Same-origin path of a chat link, or "" (never javascript:/foreign URLs).
+  const safeChatHref = (href) => {
+    if (!href || !chatIdFromHref(String(href))) return "";
+    const url = new URL(String(href), window.location.href);
+    return url.pathname + url.search;
+  };
+
+  const isChatLink = (a) => !!chatIdFromHref(a?.getAttribute?.("href"));
 
   const chatLinksIn = (root) =>
-    Array.from(root.querySelectorAll(CHAT_LINK_SELECTOR)).filter(
-      (a) => isChatLink(a) && !inZone(a),
-    );
+    safeAll(root, SITE.linkSelector).filter((a) => isChatLink(a) && !inZone(a));
 
   const countChatLinks = (node) => chatLinksIn(node).length;
 
@@ -248,14 +360,13 @@
   // Candidates in priority order. A candidate that also wraps the main
   // content (e.g. a layout container) is rejected, otherwise search results
   // would count as "sidebar".
-  const MAIN_CONTENT_SELECTOR = 'main, chat-window, [role="main"], search-page, .search-page';
   const getSidebarRoot = () => {
-    for (const selector of SIDEBAR_ROOT_SELECTOR.split(",")) {
-      const candidates = Array.from(document.querySelectorAll(selector.trim())).filter(
-        (node) => !node.querySelector(MAIN_CONTENT_SELECTOR),
+    for (const selector of SITE.sidebarSelectors) {
+      const candidates = safeAll(document, selector).filter(
+        (node) => !node.querySelector(SITE.mainSelector),
       );
       const best =
-        candidates.find((r) => r.querySelector("conversations-list, .gems-list-container")) ||
+        candidates.find((r) => r.querySelector(SITE.sidebarMarker)) ||
         candidates.find((r) => countChatLinks(r) > 0) ||
         candidates[0];
       if (best) return best;
@@ -265,19 +376,19 @@
 
   // A small wrapper around exactly one chat (link + options button), not the
   // list itself – hiding a list would also hide chats added to it later.
-  const LIST_SELECTOR =
-    "conversations-list, infinite-scroller, [class*='conversations-container'], [class*='chat-history'], ul, ol";
   const isRowWrapper = (node) => {
     if (!node || node === document.body || node === document.documentElement) return false;
-    if (node.matches(SIDEBAR_ROOT_SELECTOR) || node.matches(LIST_SELECTOR)) return false;
+    if (safeMatches(node, SIDEBAR_ROOT_SELECTOR) || safeMatches(node, SITE.listSelector)) return false;
     if (dropZone && (node === dropZone || node.contains(dropZone))) return false;
     return countChatLinks(node) === 1 && node.children.length <= 3;
   };
 
   const itemForLink = (link) => {
-    const known = link.closest(`${NATIVE_ITEM_SELECTOR}, [data-test-id="conversation"]`);
+    const known = link.closest(SITE.itemSelector);
     if (known && countChatLinks(known) <= 1) {
-      const outer = known.parentElement?.closest(NATIVE_ITEM_SELECTOR);
+      const outer = SITE.legacyItemSelector
+        ? known.parentElement?.closest(SITE.legacyItemSelector)
+        : null;
       const base = outer && countChatLinks(outer) <= 1 ? outer : known;
       const parent = base.parentElement;
       return parent && isRowWrapper(parent) ? parent : base;
@@ -294,8 +405,9 @@
   const getItemsIn = (root) => {
     if (!root) return [];
     const items = new Set(chatLinksIn(root).map(itemForLink));
-    // Older markup without /app/ links.
-    root.querySelectorAll(NATIVE_ITEM_SELECTOR).forEach((node) => {
+    if (!SITE.legacyItemSelector) return [...items];
+    // Older markup without chat links.
+    safeAll(root, SITE.legacyItemSelector).forEach((node) => {
       if (inZone(node)) return;
       if (![...items].some((i) => i.contains(node) || node.contains(i))) items.add(node);
     });
@@ -309,12 +421,18 @@
     if (!item) return null;
     const link =
       (item.matches?.("a[href]") ? item : null) ||
-      item.querySelector(CHAT_LINK_SELECTOR) ||
+      chatLinksIn(item)[0] ||
       item.querySelector("a[href]") ||
       item.closest?.("a[href]");
     let href = link?.getAttribute("href") || "";
 
-    let id = href.match(CHAT_ID_RE)?.[1] || "";
+    let id = chatIdFromHref(href);
+    if (!id) href = "";
+    if (id) {
+      // Store a same-origin path, never an absolute foreign URL.
+      const url = new URL(href, window.location.href);
+      href = url.pathname + url.search;
+    }
     if (!id) {
       const jslogOwner = item.matches?.("[jslog]") ? item : item.querySelector("[jslog]");
       id = (jslogOwner?.getAttribute("jslog") || "").match(/c_([a-zA-Z0-9]{6,})/)?.[1] || "";
@@ -325,10 +443,10 @@
         item.querySelector("[data-conversation-id]")?.getAttribute("data-conversation-id");
       if (dataId) id = dataId.replace(/^c_/, "");
     }
-    if (!href && id) href = `/app/${id}`;
+    if (!href && id) href = SITE.chatHref(id);
 
     const title =
-      cleanText(item.querySelector(".conversation-title, [class*='title']")?.textContent) ||
+      cleanText(item.querySelector(SITE.titleSelector)?.textContent) ||
       cleanText(link?.getAttribute("aria-label")) ||
       cleanText(link?.textContent) ||
       cleanText(item.textContent) ||
@@ -339,12 +457,12 @@
 
   const nativeItemFromTarget = (target) => {
     if (!target || inZone(target)) return null;
-    const link = target.closest(CHAT_LINK_SELECTOR);
+    const link = target.closest("a[href]");
     if (link && isChatLink(link)) return itemForLink(link);
-    const wrapper = target.closest(`[data-test-id="conversation"], ${NATIVE_ITEM_SELECTOR}`);
-    if (wrapper) return wrapper;
-    const inner = target.querySelector?.(CHAT_LINK_SELECTOR);
-    if (!inner || !isChatLink(inner)) return null;
+    const wrapper = target.closest(SITE.itemSelector);
+    if (wrapper && countChatLinks(wrapper) <= 1) return wrapper;
+    const inner = chatLinksIn(target)[0];
+    if (!inner) return null;
     return countChatLinks(target) === 1 ? itemForLink(inner) : null;
   };
 
@@ -384,12 +502,12 @@
       const info = getChatInfo(item);
       if (!info) return;
       const hide = keys.has(info.key);
-      if (item.classList.contains(HIDDEN_CLASS) !== hide) item.classList.toggle(HIDDEN_CLASS, hide);
+      if (item.hasAttribute(HIDDEN_ATTR) !== hide) item.toggleAttribute(HIDDEN_ATTR, hide);
       updateStoredTitle(info);
     });
 
-    document.querySelectorAll(`.${HIDDEN_CLASS}`).forEach((node) => {
-      if (!sidebarSet.has(node)) node.classList.remove(HIDDEN_CLASS);
+    document.querySelectorAll(`[${HIDDEN_ATTR}]`).forEach((node) => {
+      if (!sidebarSet.has(node)) node.removeAttribute(HIDDEN_ATTR);
     });
   };
 
@@ -473,6 +591,10 @@
     if (!body) return "dark";
     if (body.classList.contains("dark-theme")) return "dark";
     if (body.classList.contains("light-theme")) return "light";
+    // ChatGPT sets the theme as a class on <html>.
+    const root = document.documentElement;
+    if (root.classList.contains("dark")) return "dark";
+    if (root.classList.contains("light")) return "light";
     const bg = getComputedStyle(body).backgroundColor || "";
     const m = bg.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?/);
     if (m && (m[4] === undefined || parseFloat(m[4]) > 0)) {
@@ -486,6 +608,9 @@
     const theme = detectTheme();
     if (document.documentElement.dataset.gaTheme !== theme) {
       document.documentElement.dataset.gaTheme = theme;
+    }
+    if (document.documentElement.dataset.gaSite !== SITE.id) {
+      document.documentElement.dataset.gaSite = SITE.id;
     }
   };
 
@@ -509,7 +634,15 @@
         --ga-border: rgba(0,0,0,.14); --ga-surface: #ffffff; --ga-surface-2: #f0f4f9;
         --ga-drop: rgba(11,87,208,.10); --ga-danger: #b3261e;
       }
-      .${HIDDEN_CLASS} { display: none !important; }
+      /* ChatGPT: its own font and the neutral grey highlight of its sidebar. */
+      :root[data-ga-site="chatgpt"] {
+        --ga-font: ui-sans-serif, -apple-system, system-ui, "Segoe UI", Helvetica, Arial, sans-serif;
+        --ga-active: rgba(255,255,255,.12); --ga-active-fg: #ffffff; --ga-surface: #212121; --ga-surface-2: #303030;
+      }
+      :root[data-ga-site="chatgpt"][data-ga-theme="light"] {
+        --ga-active: rgba(0,0,0,.08); --ga-active-fg: #0d0d0d; --ga-surface: #ffffff; --ga-surface-2: #f4f4f4;
+      }
+      [${HIDDEN_ATTR}] { display: none !important; }
 
       ${Z} {
         display: block; box-sizing: border-box; width: 100%; max-width: 100%; min-width: 0;
@@ -948,8 +1081,8 @@
   // Navigation + active state
   // ---------------------------------------------------------------------------
   const keyFromLocation = () => {
-    const m = window.location.pathname.match(CHAT_ID_RE);
-    return m ? `id:${m[1]}` : null;
+    const id = chatIdFromHref(window.location.pathname);
+    return id ? `id:${id}` : null;
   };
 
   const setActive = (key) => {
@@ -967,13 +1100,14 @@
     setActive(chat.key);
     const item = findItemByKey(chat.key);
     const link =
-      item && (item.matches("a[href]") ? item : item.querySelector(CHAT_LINK_SELECTOR) || item.querySelector("a[href]"));
+      item && (item.matches("a[href]") && isChatLink(item) ? item : chatLinksIn(item)[0]);
     if (link) {
-      // Works for hidden elements too and keeps Gemini's SPA navigation.
+      // Works for hidden elements too and keeps the site's SPA navigation.
       link.click();
       return;
     }
-    if (chat.href) window.location.assign(chat.href);
+    const href = safeChatHref(chat.href);
+    if (href) window.location.assign(href);
   };
 
   // ---------------------------------------------------------------------------
@@ -995,11 +1129,11 @@
     !!currentDrag || dragTypes(e).includes(DRAG_MIME) || dragTypes(e).includes("text/uri-list");
 
   const chatFromUrl = (url) => {
-    const m = (url || "").match(CHAT_ID_RE);
-    if (!m) return null;
-    const key = `id:${m[1]}`;
+    const id = chatIdFromHref(url);
+    if (!id) return null;
+    const key = `id:${id}`;
     const item = findItemByKey(key);
-    return item ? getChatInfo(item) : { key, title: "Unbenannter Chat", href: `/app/${m[1]}` };
+    return item ? getChatInfo(item) : { key, title: "Unbenannter Chat", href: SITE.chatHref(id) };
   };
 
   const readDragData = (e) => {
@@ -1093,10 +1227,10 @@
     ) || null;
 
   const findMountPoint = (root) => {
-    const gems = root.querySelector(".gems-list-container");
-    if (gems) return { ref: gems, where: "after" };
-    const list = root.querySelector("conversations-list");
-    if (list) return { ref: list, where: "before" };
+    for (const point of SITE.mountPoints) {
+      const ref = safeAll(root, point.selector).find((node) => !inZone(node));
+      if (ref?.parentElement) return { ref, where: point.where };
+    }
     const firstItem = getItemsIn(root)[0];
     if (firstItem?.parentElement?.parentElement) return { ref: firstItem.parentElement, where: "before" };
     const heading = findRecentHeading(root);
@@ -1146,12 +1280,13 @@
   let pickerSuggestion = null; // name of an AI-suggested *new* folder
   let pendingAssign = null; // { choice, prompt, at }
 
-  const isNewChatPage = () => NEW_CHAT_PATH_RE.test(window.location.pathname);
+  const isNewChatPage = () => SITE.newChatPathRe.test(window.location.pathname);
 
-  const getEditor = () => document.querySelector(EDITOR_SELECTOR);
+  const getEditor = () => safeAll(document, SITE.editorSelector)[0] || null;
   const getEditorText = () => {
     const editor = getEditor();
     if (!editor) return "";
+    if (editor.tagName === "TEXTAREA") return cleanText(editor.value);
     return cleanText(editor.innerText ?? editor.textContent ?? "");
   };
 
@@ -1513,13 +1648,30 @@
   // Where to put the chip: directly before the model switcher ("Flash"),
   // otherwise before the mic button – both live in the input toolbar.
   const findToolbarAnchor = () => {
-    const scope =
-      getEditor()?.closest("input-area-v2, input-container, .input-area, form") || document;
-    for (const selector of TOOLBAR_ANCHOR_SELECTORS) {
-      const node = scope.querySelector(selector) || document.querySelector(selector);
-      if (node?.parentElement && node.closest(".ga-picker-chip") === null) return node;
+    const scope = getEditor()?.closest(SITE.composerSelector) || null;
+    // Only look inside the composer if we found one; never place the chip
+    // somewhere random on the page.
+    const roots = scope ? [scope] : [document];
+    for (const selector of SITE.toolbarAnchors) {
+      for (const root of roots) {
+        const node = safeAll(root, selector).find((n) => !n.closest(`#${PICKER_ID}`));
+        if (node?.parentElement) return insertionPoint(node, scope);
+      }
     }
     return null;
+  };
+
+  // Buttons are often wrapped in single-child <span>/<div>s; insert before
+  // the outermost such wrapper so the chip sits in the toolbar row itself.
+  const insertionPoint = (node, scope) => {
+    let point = node;
+    for (let depth = 0; depth < 3; depth += 1) {
+      const parent = point.parentElement;
+      if (!parent || parent === scope || parent.children.length !== 1) break;
+      if (parent.contains(getEditor())) break;
+      point = parent;
+    }
+    return point;
   };
 
   const mountPicker = () => {
@@ -1546,18 +1698,28 @@
     if (!isNewChatPage() || !pickerChoice) return;
     const prompt = getEditorText();
     if (!prompt) return;
-    pendingAssign = { choice: pickerChoice, prompt, at: Date.now() };
+    pendingAssign = {
+      choice: pickerChoice,
+      prompt,
+      at: Date.now(),
+      // Chats that already existed when sending can't be the new one – this
+      // prevents filing an old chat if the new one never got an id (e.g. a
+      // temporary chat) and the user opens another chat afterwards.
+      knownKeys: new Set(uniqueChats(getAllItems()).map((c) => c.key)),
+    };
   };
 
   const bindSendDetection = () => {
     const onKeyDown = (e) => {
       if (e.key !== "Enter" || e.shiftKey || e.isComposing) return;
       const target = e.target instanceof Element ? e.target : null;
-      if (target?.closest(EDITOR_SELECTOR)) captureSend();
+      if (target && safeAll(document, SITE.editorSelector).some((ed) => ed.contains(target))) {
+        captureSend();
+      }
     };
     const onClick = (e) => {
       const target = e.target instanceof Element ? e.target : null;
-      const button = target?.closest(SEND_BUTTON_SELECTOR);
+      const button = target?.closest(SITE.sendSelector);
       if (button && !button.closest(`#${PICKER_ID}`)) captureSend();
     };
     document.addEventListener("keydown", onKeyDown, true);
@@ -1574,7 +1736,7 @@
     const chat = {
       key,
       title: (item && getChatInfo(item)?.title) || pending.prompt.slice(0, 60),
-      href: window.location.pathname,
+      href: safeChatHref(window.location.pathname),
     };
 
     let folder = null;
@@ -1606,6 +1768,7 @@
   let lastUrl = window.location.href;
   const watchUrl = () => {
     if (window.location.href === lastUrl) return;
+    const previousPath = new URL(lastUrl).pathname;
     lastUrl = window.location.href;
     const key = keyFromLocation();
 
@@ -1613,7 +1776,13 @@
     if (key && pendingAssign) {
       const pending = pendingAssign;
       pendingAssign = null;
-      if (!storedKeys().has(key)) assignNewChat(key, pending);
+      // Only the chat created right from the new-chat page gets filed.
+      const cameFromNewChat = SITE.newChatPathRe.test(previousPath);
+      if (cameFromNewChat && !pending.knownKeys.has(key) && !storedKeys().has(key)) {
+        assignNewChat(key, pending);
+      }
+    } else if (pendingAssign && !isNewChatPage()) {
+      pendingAssign = null; // navigated elsewhere without a new chat id
     }
 
     setActive(key);
@@ -1666,7 +1835,12 @@
     });
 
     Array.from(root.children)
-      .filter((child) => child.matches(NATIVE_ITEM_SELECTOR) && !child.classList.contains("ga-folder"))
+      .filter(
+        (child) =>
+          SITE.legacyItemSelector &&
+          child.matches(SITE.legacyItemSelector) &&
+          !child.classList.contains("ga-folder"),
+      )
       .forEach((child) => {
         const info = getChatInfo(child);
         if (info) migrated.looseChats.push(info);
@@ -1746,13 +1920,13 @@
           return;
         case "ga:refresh": {
           const mounted = ensure();
-          sendResponse({ ok: true, mounted, nativeCount: getSidebarItems().length });
+          sendResponse({ ok: true, site: SITE.id, mounted, nativeCount: getSidebarItems().length });
           return;
         }
         case "ga:get-chats":
           ensure();
           // Sidebar + search page results (whatever Gemini has loaded).
-          sendResponse({ ok: true, chats: uniqueChats([...getSidebarItems(), ...getAllItems()]) });
+          sendResponse({ ok: true, site: SITE.id, chats: uniqueChats([...getSidebarItems(), ...getAllItems()]) });
           return;
         default:
       }
@@ -1790,7 +1964,7 @@
     ensure();
     console.info(
       LOG,
-      `aktiv – ${getSidebarItems().length} Chats in der Seitenleiste erkannt,`,
+      `aktiv auf ${SITE.label} – ${getSidebarItems().length} Chats in der Seitenleiste erkannt,`,
       `${state.folders.length} Ordner geladen.`,
     );
 
